@@ -340,10 +340,24 @@ return QRCode;
 
     <!-- ═══════════ VISTA: HISTORIAL ═══════════ -->
     <div id="view-history" style="display:none">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="font-weight:700;font-size:16px">📋 Historial de Ventas</div>
-        <span id="histCount" class="tag tag-blue"></span>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:700;font-size:16px">📋 Historial de Ventas</div>
+          <span id="histCount" class="tag tag-blue"></span>
+        </div>
       </div>
+
+      <!-- Filtro por cliente -->
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <div style="flex:1;min-width:200px;position:relative">
+          <input class="input" id="histSearch" placeholder="🔍 Filtrar por nombre de clienta..." oninput="renderHistory()" style="padding-right:36px">
+          <button id="histClearBtn" onclick="document.getElementById('histSearch').value='';renderHistory()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">×</button>
+        </div>
+      </div>
+
+      <!-- Resumen del cliente filtrado -->
+      <div id="histClientSummary" style="display:none;margin-bottom:12px"></div>
+
       <div id="historyList"></div>
     </div>
 
@@ -1046,16 +1060,16 @@ function generateTicketPDF(sale) {
     ln(7);
   });
 
-  doc.setLineWidth(0.3); doc.line(PL, y, W-PR, y); ln(5);
+  doc.setLineWidth(0.3); doc.line(PL, y, W-PR, y); ln(7);
 
   // Totales
   doc.setFontSize(11); doc.setFont('helvetica','normal');
   doc.text('Subtotal:', W-PR-65, y);
-  doc.text(fmt(sale.total), W-PR, y, {align:'right'}); ln(7);
-  doc.setLineWidth(0.5); doc.line(W-PR-80, y, W-PR, y); ln(4);
-  doc.setFontSize(15); doc.setFont('helvetica','bold');
-  doc.text('TOTAL A PAGAR:', W-PR-85, y);
-  doc.text(fmt(sale.total), W-PR, y, {align:'right'}); ln(12);
+  doc.text(fmt(sale.total), W-PR, y, {align:'right'}); ln(9);
+  doc.setLineWidth(0.6); doc.line(W-PR-90, y, W-PR, y); ln(7);
+  doc.setFontSize(16); doc.setFont('helvetica','bold');
+  doc.text('TOTAL A PAGAR:', W-PR-90, y);
+  doc.text(fmt(sale.total), W-PR, y, {align:'right'}); ln(14);
 
   // Mensaje despedida
   doc.setFont('helvetica','italic'); doc.setFontSize(11);
@@ -1063,19 +1077,19 @@ function generateTicketPDF(sale) {
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(150,150,150);
   doc.text('Comprobante de venta — ' + (cfg.bizName || 'MI NEGOCIO'), W/2, y, {align:'center'});
 
-  // QR Code
+  // QR Code — siempre se genera
   const qrDataUrl = makeQRDataURL(getSaleQRText(sale));
+  ln(6);
   if (qrDataUrl) {
-    const qrSize = 32;
-    ln(4);
+    const qrSize = 35;
     doc.addImage(qrDataUrl, 'PNG', W/2 - qrSize/2, y, qrSize, qrSize);
-    ln(qrSize + 3);
-    doc.setFontSize(7.5); doc.setTextColor(130,130,130);
-    doc.text('Escanea el QR para consultar esta nota', W/2, y, {align:'center'});
-    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(100,100,100);
-    ln(5);
-    doc.text(`Folio: #${sale.id.slice(-8).toUpperCase()}`, W/2, y, {align:'center'});
+    ln(qrSize + 4);
   }
+  doc.setFontSize(7.5); doc.setTextColor(130,130,130);
+  doc.text('Escanea el QR para consultar esta nota', W/2, y, {align:'center'});
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(100,100,100);
+  ln(5);
+  doc.text('Folio: #' + sale.id.slice(-8).toUpperCase(), W/2, y, {align:'center'});
 
   doc.save(`ticket_${safe(sale.customer)}_${sale.id.slice(-6)}.pdf`);
 }
@@ -1293,14 +1307,55 @@ function doCut() {
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
 function renderHistory() {
   const list = document.getElementById('historyList');
-  document.getElementById('histCount').textContent = `${sales.length} ventas`;
+  const q = (document.getElementById('histSearch')?.value || '').trim().toLowerCase();
+  const clearBtn = document.getElementById('histClearBtn');
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
 
-  if (!sales.length) {
-    list.innerHTML = '<div class="empty"><div class="icon">📋</div><div>Sin ventas registradas</div></div>';
+  const filtered = q
+    ? sales.filter(s => s.customer.toLowerCase().includes(q))
+    : sales;
+
+  document.getElementById('histCount').textContent = q
+    ? `${filtered.length} de ${sales.length} ventas`
+    : `${sales.length} ventas`;
+
+  // Resumen del cliente filtrado
+  const summaryEl = document.getElementById('histClientSummary');
+  if (q && filtered.length > 0) {
+    const totalCliente   = filtered.reduce((s,x) => s+x.total, 0);
+    const gananciaCliente = filtered.reduce((s,x) => s+x.profit, 0);
+    const clientes = [...new Set(filtered.map(s => s.customer))];
+    summaryEl.style.display = '';
+    summaryEl.innerHTML = `
+      <div style="background:var(--accent-light);border:1px solid var(--accent);border-radius:8px;padding:12px 16px">
+        <div style="font-weight:700;color:var(--accent);margin-bottom:8px;font-size:13px">
+          📊 Resumen — ${clientes.join(', ')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--accent)">${filtered.length}</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Compras</div>
+          </div>
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--orange)">${fmt(totalCliente)}</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Total gastado</div>
+          </div>
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--green)">${fmt(gananciaCliente)}</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Tu ganancia</div>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    summaryEl.style.display = 'none';
+  }
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty"><div class="icon">📋</div><div>${q ? 'Sin ventas para "'+q+'"' : 'Sin ventas registradas'}</div></div>`;
     return;
   }
 
-  list.innerHTML = [...sales].reverse().map(s => `
+  list.innerHTML = [...filtered].reverse().map(s => `
     <div class="card" style="margin-bottom:10px">
       <div style="padding:12px 16px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
