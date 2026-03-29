@@ -11,6 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 :root {
@@ -180,24 +181,59 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 
 <!-- ═══ TAB: VENTA ═══ -->
 <div id="tab-venta" class="content" style="display:none" id="ventaContent">
+
+  <!-- Nombre de la clienta -->
   <div class="input-group">
     <label>👤 Nombre de la clienta</label>
     <input class="input" id="ventaCliente" placeholder="Ej: María García" style="font-size:16px">
   </div>
 
+  <!-- Cámara escáner persistente -->
+  <div class="card" style="margin-bottom:12px;overflow:hidden">
+    <div style="background:var(--blue);padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="color:white;font-weight:700;font-size:13px">📷 Escáner de productos</span>
+      <div style="display:flex;gap:8px">
+        <button id="btnAbrirCamara" onclick="abrirCamaraVenta()"
+          style="background:white;color:var(--blue);border:none;border-radius:6px;padding:6px 12px;font-weight:700;font-size:12px;cursor:pointer;touch-action:manipulation">
+          ▶ Abrir cámara
+        </button>
+        <button id="btnCerrarCamara" onclick="cerrarCamaraVenta()" style="display:none;
+          background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.5);border-radius:6px;padding:6px 12px;font-weight:700;font-size:12px;cursor:pointer;touch-action:manipulation">
+          ✕ Cerrar
+        </button>
+      </div>
+    </div>
+    <!-- Video de cámara -->
+    <div id="ventaCamaraBox" style="display:none;background:#000;position:relative">
+      <video id="ventaVideo" style="width:100%;height:220px;object-fit:cover;display:block" autoplay playsinline muted></video>
+      <canvas id="ventaCanvas" style="display:none"></canvas>
+      <!-- Guía de escaneo -->
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:120px;border:2px solid rgba(255,255,255,0.7);border-radius:8px;pointer-events:none"></div>
+      <div style="position:absolute;bottom:8px;left:0;right:0;text-align:center;color:rgba(255,255,255,0.8);font-size:11px;font-weight:600">
+        Apunta al código de barras
+      </div>
+    </div>
+    <!-- Último producto escaneado -->
+    <div id="ultimoEscaneado" style="display:none;padding:10px 14px;background:#f0fff4;border-top:1px solid #bbf7d0">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;margin-bottom:3px">Ultimo escaneado</div>
+      <div id="ultimoEscaneadoTxt" style="font-weight:700;color:var(--green);font-size:14px"></div>
+    </div>
+  </div>
+
+  <!-- Búsqueda manual -->
   <div class="input-group">
-    <label>Buscar y agregar producto</label>
+    <label>🔍 O busca manualmente</label>
     <div style="display:flex;gap:8px">
       <input class="input" id="ventaSearch" placeholder="Nombre o código..." oninput="searchVenta()" style="flex:1">
-      <button onclick="startScan('venta')" style="background:var(--blue);color:white;border:none;border-radius:8px;padding:0 14px;font-size:20px;cursor:pointer;touch-action:manipulation;flex-shrink:0">📷</button>
     </div>
     <div id="ventaSearchResults" style="display:none;background:white;border:1px solid var(--border);border-radius:8px;margin-top:6px;max-height:200px;overflow-y:auto"></div>
   </div>
 
+  <!-- Carrito -->
   <div class="card">
     <div class="card-title">🛒 Carrito</div>
     <div id="cartList">
-      <div class="empty"><div class="icon">🛒</div><p>Agrega productos</p></div>
+      <div class="empty"><div class="icon">🛒</div><p>Escanea o busca productos</p></div>
     </div>
   </div>
 
@@ -360,79 +396,109 @@ function showTab(tab) {
   document.querySelectorAll('.nav button').forEach((btn, i) => {
     btn.classList.toggle('active', ['scanner','inventario','venta','notas','agregar'][i] === tab);
   });
+  // Cerrar cámara general al cambiar pestaña
   stopScan();
+  // Cerrar cámara de venta al salir de venta
+  if (tab !== 'venta') cerrarCamaraVenta();
   if (tab === 'venta') updateCartUI();
   if (tab === 'agregar') renderUltimosProductos();
 }
 
-// ─── SONIDOS DEL ESCÁNER ──────────────────────────────────────────────────────
-let _audioCtx = null;
 
-function getAudioCtx() {
-  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  return _audioCtx;
+// ─── CÁMARA PERSISTENTE PARA VENTA ───────────────────────────────────────────
+let _ventaStream = null;
+let _ventaScanning = false;
+let _lastCode = '';
+let _lastCodeTime = 0;
+
+function abrirCamaraVenta() {
+  document.getElementById('ventaCamaraBox').style.display = '';
+  document.getElementById('btnAbrirCamara').style.display = 'none';
+  document.getElementById('btnCerrarCamara').style.display = '';
+
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+  }).then(stream => {
+    _ventaStream = stream;
+    _ventaScanning = true;
+    const video = document.getElementById('ventaVideo');
+    video.srcObject = stream;
+    video.play();
+    video.onloadedmetadata = () => ventaScanFrame();
+  }).catch(() => {
+    toast('No se pudo acceder a la cámara', 'error');
+    cerrarCamaraVenta();
+  });
 }
 
-// Beep de código de barras — como tienda departamental (tono corto y agudo)
-function beepBarcode() {
-  try {
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(1800, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(1600, ctx.currentTime + 0.08);
-    gain.gain.setValueAtTime(0.6, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.12);
-  } catch {}
+function cerrarCamaraVenta() {
+  _ventaScanning = false;
+  if (_ventaStream) {
+    _ventaStream.getTracks().forEach(t => t.stop());
+    _ventaStream = null;
+  }
+  const box = document.getElementById('ventaCamaraBox');
+  if (box) box.style.display = 'none';
+  const btnAbrir = document.getElementById('btnAbrirCamara');
+  if (btnAbrir) btnAbrir.style.display = '';
+  const btnCerrar = document.getElementById('btnCerrarCamara');
+  if (btnCerrar) btnCerrar.style.display = 'none';
+  const ult = document.getElementById('ultimoEscaneado');
+  if (ult) ult.style.display = 'none';
 }
 
-// Beep de QR de nota — doble tono suave y diferente
-function beepQR() {
-  try {
-    const ctx = getAudioCtx();
-    // Primer tono
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.connect(gain1); gain1.connect(ctx.destination);
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(900, ctx.currentTime);
-    gain1.gain.setValueAtTime(0.5, ctx.currentTime);
-    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-    osc1.start(ctx.currentTime);
-    osc1.stop(ctx.currentTime + 0.1);
-    // Segundo tono (más agudo)
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.connect(gain2); gain2.connect(ctx.destination);
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(1400, ctx.currentTime + 0.12);
-    gain2.gain.setValueAtTime(0.5, ctx.currentTime + 0.12);
-    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
-    osc2.start(ctx.currentTime + 0.12);
-    osc2.stop(ctx.currentTime + 0.28);
-  } catch {}
+function ventaScanFrame() {
+  if (!_ventaScanning) return;
+  const video = document.getElementById('ventaVideo');
+  if (!video || video.readyState !== 4) { setTimeout(ventaScanFrame, 150); return; }
+
+  if ('BarcodeDetector' in window) {
+    const detector = new BarcodeDetector({
+      formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code','data_matrix']
+    });
+    detector.detect(video).then(codes => {
+      if (codes.length > 0 && _ventaScanning) {
+        const code = codes[0].rawValue;
+        const now = Date.now();
+        // Evitar duplicados: mismo código en menos de 2 segundos se ignora
+        if (code !== _lastCode || now - _lastCodeTime > 2000) {
+          _lastCode = code;
+          _lastCodeTime = now;
+          handleVentaScan(code);
+        }
+      }
+      if (_ventaScanning) setTimeout(ventaScanFrame, 300);
+    }).catch(() => { if (_ventaScanning) setTimeout(ventaScanFrame, 300); });
+  } else {
+    setTimeout(ventaScanFrame, 300);
+  }
 }
 
-// ─── ESCÁNER DE CÁMARA ────────────────────────────────────────────────────────
+function handleVentaScan(code) {
+  // Si es QR de nota ignorar
+  if (code.includes('Folio:') || code.includes('ID:') || code.includes('TOTAL:')) {
+    toast('QR de nota — usa la pestana Notas', 'info');
+    return;
+  }
+  const prod = products.find(p => p.barcode && p.barcode === code);
+  const ultEl  = document.getElementById('ultimoEscaneado');
+  const ultTxt = document.getElementById('ultimoEscaneadoTxt');
+  if (prod) {
+    addToCartMobile(prod.id);
+    if (ultEl)  ultEl.style.display = '';
+    if (ultTxt) { ultTxt.style.color = 'var(--green)'; ultTxt.textContent = '+ ' + prod.name + ' — $' + prod.sellPrice.toFixed(2); }
+    if (navigator.vibrate) navigator.vibrate(80);
+  } else {
+    if (ultEl)  ultEl.style.display = '';
+    if (ultTxt) { ultTxt.style.color = 'var(--red)'; ultTxt.textContent = 'No encontrado: ' + code; }
+    toast('Producto no encontrado en inventario', 'error');
+  }
+}
+
+// ─── SCANNER ──────────────────────────────────────────────────────────────────
 let scanMode = 'multi';
 let _stream = null;
 let _scanning = false;
-let _detector = null;
-
-// Crear detector una sola vez para mayor velocidad
-function getDetector() {
-  if (!_detector && 'BarcodeDetector' in window) {
-    _detector = new BarcodeDetector({
-      formats: ['qr_code','ean_13','ean_8','code_128','code_39','upc_a','upc_e','data_matrix','pdf417','itf','codabar']
-    });
-  }
-  return _detector;
-}
 
 function startScan(mode) {
   scanMode = mode;
@@ -442,22 +508,12 @@ function startScan(mode) {
   document.getElementById('scannerCard').style.display = '';
   document.getElementById('scanResultCard').style.display = 'none';
   document.getElementById('scannerBox').innerHTML = `
-    <video id="scanVideo" style="width:100%;height:260px;object-fit:cover;display:block;border-radius:8px" autoplay playsinline muted></video>
+    <video id="scanVideo" style="width:100%;height:260px;object-fit:cover;display:block" autoplay playsinline muted></video>
     <canvas id="scanCanvas" style="display:none"></canvas>
-    <div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);color:white;font-size:11px;padding:4px 12px;border-radius:20px">
-      Apunta al código de barras o QR
-    </div>
   `;
-  document.getElementById('scannerBox').style.position = 'relative';
 
   navigator.mediaDevices.getUserMedia({
-    video: {
-      facingMode: 'environment',
-      width:  { ideal: 1920 },
-      height: { ideal: 1080 },
-      focusMode: 'continuous',
-      advanced: [{ focusMode: 'continuous' }]
-    }
+    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
   }).then(stream => {
     _stream = stream;
     _scanning = true;
@@ -474,23 +530,49 @@ function startScan(mode) {
 function scanFrame() {
   if (!_scanning) return;
   const video = document.getElementById('scanVideo');
-  if (!video || video.readyState !== 4) {
-    setTimeout(scanFrame, 50);
+  const canvas = document.getElementById('scanCanvas');
+  if (!video || !canvas || video.readyState !== 4) {
+    setTimeout(scanFrame, 100);
     return;
   }
 
-  const detector = getDetector();
-  if (detector) {
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+
+  try {
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = window.ZXing
+      ? decodeWithZXing(canvas)
+      : null;
+    if (code) {
+      handleCode(code);
+      return;
+    }
+  } catch {}
+
+  // Intentar con BarcodeDetector nativo (Android Chrome)
+  if ('BarcodeDetector' in window) {
+    const detector = new BarcodeDetector({ formats: ['qr_code','ean_13','ean_8','code_128','code_39','upc_a','upc_e','data_matrix','pdf417'] });
     detector.detect(video).then(codes => {
       if (codes.length > 0 && _scanning) {
         handleCode(codes[0].rawValue);
       } else if (_scanning) {
-        setTimeout(scanFrame, 80); // más rápido — 80ms entre frames
+        setTimeout(scanFrame, 200);
       }
-    }).catch(() => { if (_scanning) setTimeout(scanFrame, 80); });
+    }).catch(() => { if (_scanning) setTimeout(scanFrame, 200); });
   } else {
-    setTimeout(scanFrame, 80);
+    setTimeout(scanFrame, 200);
   }
+}
+
+function decodeWithZXing(canvas) {
+  try {
+    const reader = new ZXing.BrowserMultiFormatReader();
+    // ZXing sync decode no disponible en todos los builds
+    return null;
+  } catch { return null; }
 }
 
 function stopScan() {
@@ -499,32 +581,27 @@ function stopScan() {
     _stream.getTracks().forEach(t => t.stop());
     _stream = null;
   }
-  const card = document.getElementById('scannerCard');
-  if (card) card.style.display = 'none';
-  const box = document.getElementById('scannerBox');
-  if (box) box.innerHTML = '';
+  document.getElementById('scannerCard').style.display = 'none';
+  document.getElementById('scannerBox').innerHTML = '';
 }
 
 function handleCode(code) {
   stopScan();
 
-  console.log('Codigo escaneado:', code);
+  console.log('Código escaneado:', code);
 
-  // ¿Es un QR de nota?
-  const esNota = code.includes('Folio:') ||
-                 code.includes('Cliente:') ||
+  // ¿Es un QR de nota? — detectar por múltiples patrones
+  const esNota = code.includes('Folio:') || 
+                 code.includes('Cliente:') || 
                  code.includes('TOTAL:') ||
-                 code.includes('ID:') ||
+                 code.includes('MI NEGOCIO') ||
+                 code.includes(cfg.bizName) ||
                  /NEGOCIO|Folio|Cliente|TOTAL/i.test(code);
 
   if (esNota) {
-    beepQR(); // sonido doble para QR de nota
     showQRNota(code);
     return;
   }
-
-  // Es código de barras — sonido de escáner
-  beepBarcode();
 
   // Modo: capturar código de barras para nuevo producto
   if (scanMode === 'barcode') {
