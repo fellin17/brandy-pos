@@ -183,7 +183,11 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 <div id="tab-venta" class="content" style="display:none" id="ventaContent">
   <div class="input-group">
     <label>👤 Nombre de la clienta</label>
-    <input class="input" id="ventaCliente" placeholder="Ej: María García" style="font-size:16px">
+    <div style="position:relative">
+      <input class="input" id="ventaCliente" placeholder="Ej: María García" style="font-size:16px"
+        oninput="mobClienteAC(this.value)" autocomplete="off">
+      <div id="mobClienteSugg" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 10px 10px;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-height:200px;overflow-y:auto"></div>
+    </div>
   </div>
 
   <div class="input-group">
@@ -207,10 +211,15 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 
 <!-- ═══ TAB: NOTAS ═══ -->
 <div id="tab-notas" class="content" style="display:none">
-  <div style="display:flex;gap:8px;margin-bottom:12px">
-    <input class="input" id="notaSearch" placeholder="Buscar por nombre de clienta..." oninput="renderNotas()" style="flex:1">
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <div style="flex:1;position:relative">
+      <input class="input" id="notaSearch" placeholder="Buscar por nombre de clienta..."
+        oninput="renderNotas();mobNotaAC(this.value)" autocomplete="off" style="flex:1">
+      <div id="mobNotaSugg" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 10px 10px;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-height:180px;overflow-y:auto"></div>
+    </div>
     <button onclick="startScan('nota')" style="background:var(--blue);color:white;border:none;border-radius:8px;padding:0 14px;font-size:20px;cursor:pointer;touch-action:manipulation;flex-shrink:0">📷</button>
   </div>
+  <button class="btn btn-blue" style="margin-bottom:12px" onclick="mobReporteClientaPDF()">📄 Reporte de esta clienta</button>
   <div id="notasList"></div>
 </div>
 
@@ -718,14 +727,13 @@ async function completarVenta() {
     qrData: `ID:${Date.now().toString()}\nFolio: #${Date.now().toString().slice(-8).toUpperCase()}\nCliente: ${customer}\nTOTAL: $${total.toFixed(2)}`
   };
 
-  // Descontar stock
-  products = products.map(p => {
-    const ci = cart.find(i => i.id === p.id);
-    return ci ? { ...p, stock: p.stock - ci.qty } : p;
-  });
+  // Guardar clienta en lista
+  if (!cfg.customers) cfg.customers = [];
+  if (customer && !cfg.customers.includes(customer)) {
+    cfg.customers.push(customer);
+  }
 
-  sales.push(sale);
-  await saveData();
+  // Descontar stock
 
   // WhatsApp
   const lineas = sale.items.map(i => `• ${i.name} ×${i.qty} — $${(i.sellPrice * i.qty).toFixed(2)}`).join('\n');
@@ -867,6 +875,126 @@ function generarPDFNota(saleId) {
 
   doc.save(`ticket_${sale.customer.replace(/\s+/g,'_')}_${sale.id.slice(-6)}.pdf`);
   toast('📄 PDF descargado');
+}
+
+// ─── AUTOCOMPLETADO CLIENTAS (MÓVIL) ─────────────────────────────────────────
+function getMobClientas() {
+  const fromSales = sales.map(s => s.customer).filter(Boolean);
+  const fromCfg   = cfg.customers || [];
+  return [...new Set([...fromCfg, ...fromSales])].sort();
+}
+
+function mobClienteAC(val) {
+  const box = document.getElementById('mobClienteSugg');
+  if (!val || val.length < 2) { box.style.display = 'none'; return; }
+  const q = val.toLowerCase();
+  const matches = getMobClientas().filter(c => c.toLowerCase().includes(q) && c.toLowerCase() !== q);
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(c => `
+    <div onclick="mobSelectCliente('${c.replace(/'/g,"\\'")}',this)"
+      style="padding:14px;cursor:pointer;font-size:14px;font-weight:600;border-bottom:1px solid var(--border);touch-action:manipulation">
+      👤 ${c}
+    </div>`).join('');
+  box.style.display = 'block';
+}
+
+function mobSelectCliente(name) {
+  document.getElementById('ventaCliente').value = name;
+  document.getElementById('mobClienteSugg').style.display = 'none';
+}
+
+function mobNotaAC(val) {
+  const box = document.getElementById('mobNotaSugg');
+  if (!val || val.length < 2) { box.style.display = 'none'; return; }
+  const q = val.toLowerCase();
+  const matches = getMobClientas().filter(c => c.toLowerCase().includes(q));
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(c => `
+    <div onclick="mobSelectNota('${c.replace(/'/g,"\\'")}',this)"
+      style="padding:14px;cursor:pointer;font-size:14px;font-weight:600;border-bottom:1px solid var(--border);touch-action:manipulation">
+      👤 ${c}
+    </div>`).join('');
+  box.style.display = 'block';
+}
+
+function mobSelectNota(name) {
+  document.getElementById('notaSearch').value = name;
+  document.getElementById('mobNotaSugg').style.display = 'none';
+  renderNotas();
+}
+
+// ─── REPORTE PDF CLIENTA (MÓVIL) ──────────────────────────────────────────────
+function mobReporteClientaPDF() {
+  const nombre = (document.getElementById('notaSearch')?.value || '').trim();
+  if (!nombre) { toast('Escribe el nombre de la clienta primero', 'error'); return; }
+
+  const ventasCliente = sales.filter(s =>
+    s.customer.toLowerCase().includes(nombre.toLowerCase())
+  ).sort((a,b) => new Date(a.date) - new Date(b.date));
+
+  if (!ventasCliente.length) { toast('Sin ventas para "' + nombre + '"', 'error'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'letter', orientation:'portrait' });
+  const W = 216, PL = 20, PR = 20;
+  let y = 20;
+  const ln = (h=5) => { y += h; };
+
+  // Encabezado
+  doc.setFontSize(20); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+  doc.text(cfg.bizName || 'MI NEGOCIO', W/2, y, {align:'center'}); ln(8);
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
+  const ahora = new Date();
+  doc.text('Reporte generado el ' +
+    ahora.toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}) +
+    ' a las ' + ahora.toLocaleTimeString('es-MX'), W/2, y, {align:'center'});
+  doc.setTextColor(0,0,0); ln(8);
+  doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(5);
+
+  // Clienta
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(25,55,170);
+  doc.text('HISTORIAL — ' + ventasCliente[0].customer, PL, y); ln(6);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(80,80,80);
+  doc.text('Primera compra: ' + new Date(ventasCliente[0].date).toLocaleDateString('es-MX') +
+    '   |   Total de compras: ' + ventasCliente.length, PL, y);
+  doc.setTextColor(0,0,0); ln(7);
+  doc.setLineWidth(0.3); doc.line(PL, y, W-PR, y); ln(5);
+
+  // Tabla
+  doc.setFillColor(25,55,170); doc.rect(PL, y-3, W-PL-PR, 9, 'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('FECHA', PL+4, y+2);
+  doc.text('FOLIO', PL+45, y+2);
+  doc.text('PRODUCTOS', PL+75, y+2);
+  doc.text('TOTAL', W-PR, y+2, {align:'right'});
+  ln(9); doc.setTextColor(0,0,0);
+
+  let total = 0;
+  ventasCliente.forEach((s,idx) => {
+    if (y > 248) { doc.addPage(); y = 20; }
+    if (idx%2===0) { doc.setFillColor(248,250,255); doc.rect(PL,y-3,W-PL-PR,9,'F'); }
+    const prods = s.items.map(i=>i.name+' x'+i.qty).join(', ');
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+    doc.text(new Date(s.date).toLocaleDateString('es-MX'), PL+4, y);
+    doc.setTextColor(100,100,100);
+    doc.text('#'+s.id.slice(-6).toUpperCase(), PL+45, y);
+    doc.text(prods.length>55?prods.slice(0,55)+'...':prods, PL+75, y);
+    doc.setFont('helvetica','bold'); doc.setTextColor(25,55,170);
+    doc.text('$'+s.total.toFixed(2), W-PR, y, {align:'right'});
+    doc.setDrawColor(210,215,230); doc.setLineWidth(0.1);
+    doc.line(PL, y+4, W-PR, y+4); doc.setDrawColor(0);
+    total += s.total; ln(9);
+  });
+
+  // Total
+  ln(3); doc.setLineWidth(0.5); doc.line(PL,y,W-PR,y); ln(5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(22,163,74);
+  doc.text('TOTAL ACUMULADO: $'+total.toFixed(2), W-PR, y, {align:'right'});
+  doc.setTextColor(160,160,160); doc.setFont('helvetica','italic'); doc.setFontSize(8);
+  ln(12); doc.text((cfg.bizName||'MI NEGOCIO')+' — Reporte automatico', W/2, y, {align:'center'});
+
+  doc.save('reporte_'+ventasCliente[0].customer.replace(/\s+/g,'_')+'.pdf');
+  toast('PDF de ' + ventasCliente[0].customer + ' descargado');
 }
 
 // ─── TOAST ────────────────────────────────────────────────────────────────────

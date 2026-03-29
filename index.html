@@ -250,7 +250,13 @@ return QRCode;
         <div>
           <div class="input-group" style="margin-bottom:12px">
             <label>👤 Nombre de la clienta</label>
-            <input class="input" id="posCustomer" placeholder="Ej: María García" oninput="updateCartUI()">
+            <div style="position:relative">
+              <input class="input" id="posCustomer" placeholder="Ej: María García"
+                oninput="updateCartUI();customerAutocomplete(this.value)"
+                onkeydown="customerKeydown(event)"
+                autocomplete="off">
+              <div id="customerSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto"></div>
+            </div>
           </div>
 
           <div class="input-group">
@@ -348,10 +354,18 @@ return QRCode;
       </div>
 
       <!-- Filtro por cliente -->
-      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <div style="flex:1;min-width:200px;position:relative">
-          <input class="input" id="histSearch" placeholder="🔍 Filtrar por nombre de clienta..." oninput="renderHistory()" style="padding-right:36px">
-          <button id="histClearBtn" onclick="document.getElementById('histSearch').value='';renderHistory()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">×</button>
+      <div style="margin-bottom:8px;position:relative">
+        <div style="display:flex;gap:8px">
+          <div style="flex:1;position:relative">
+            <input class="input" id="histSearch"
+              placeholder="🔍 Filtrar o buscar clienta..."
+              oninput="renderHistory();histAutocomplete(this.value)"
+              onkeydown="histKeydown(event)"
+              autocomplete="off">
+            <div id="histSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:160px;overflow-y:auto"></div>
+          </div>
+          <button onclick="generarReporteClientaPDF()" class="btn btn-primary btn-sm" title="Reporte PDF de la clienta buscada">📄 Reporte</button>
+          <button id="histClearBtn" onclick="document.getElementById('histSearch').value='';renderHistory()" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:700">✕</button>
         </div>
       </div>
 
@@ -627,6 +641,7 @@ let cfg = {
   msg:'¡Gracias por su compra! Vuelva pronto 😊',
   logo:'🏪', printerTicket:'', printerLabel:'',
   labelNameSize:10, labelPriceSize:16,
+  customers: [],
 };
 let cart = [], editProdId = null;
 
@@ -1115,6 +1130,11 @@ function saveSaleFromCart() {
     items: cart.map(i => ({ ...i })),
     total, profit, inCut: false,
   };
+
+  // Guardar clienta en lista de clientas conocidas
+  if (customer && !cfg.customers.includes(customer)) {
+    cfg.customers.push(customer);
+  }
 
   // Descontar stock
   products = products.map(p => {
@@ -1746,7 +1766,196 @@ function escJs(s)  { return String(s).replace(/'/g,"\\'"); }
 function safe(s)   { return String(s).replace(/[^a-zA-Z0-9_\-]/g,'_'); }
 
 // ─── ALERTA DE STOCK BAJO ─────────────────────────────────────────────────────
-function checkStockAlerts(updatedProducts) {
+// ─── AUTOCOMPLETADO DE CLIENTAS ───────────────────────────────────────────────
+function getClientasList() {
+  // Combina las de cfg.customers con las que aparecen en ventas (retrocompatible)
+  const fromSales = sales.map(s => s.customer).filter(Boolean);
+  const all = [...new Set([...(cfg.customers||[]), ...fromSales])].sort();
+  return all;
+}
+
+function customerAutocomplete(val) {
+  const box = document.getElementById('customerSuggestions');
+  if (!val || val.length < 2) { box.style.display = 'none'; return; }
+  const q = val.toLowerCase();
+  const matches = getClientasList().filter(c => c.toLowerCase().includes(q) && c.toLowerCase() !== q);
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(c => `
+    <div onclick="selectCustomer('${escJs(c)}')" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);transition:background .1s"
+      onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background=''">
+      👤 ${c}
+    </div>`).join('');
+  box.style.display = 'block';
+}
+
+function selectCustomer(name) {
+  document.getElementById('posCustomer').value = name;
+  document.getElementById('customerSuggestions').style.display = 'none';
+  updateCartUI();
+}
+
+function customerKeydown(e) {
+  if (e.key === 'Escape') {
+    document.getElementById('customerSuggestions').style.display = 'none';
+  }
+}
+
+function histAutocomplete(val) {
+  const box = document.getElementById('histSuggestions');
+  if (!val || val.length < 2) { box.style.display = 'none'; return; }
+  const q = val.toLowerCase();
+  const matches = getClientasList().filter(c => c.toLowerCase().includes(q));
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(c => `
+    <div onclick="selectHistCustomer('${escJs(c)}')" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);transition:background .1s"
+      onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background=''">
+      👤 ${c}
+    </div>`).join('');
+  box.style.display = 'block';
+}
+
+function selectHistCustomer(name) {
+  document.getElementById('histSearch').value = name;
+  document.getElementById('histSuggestions').style.display = 'none';
+  renderHistory();
+}
+
+function histKeydown(e) {
+  if (e.key === 'Escape') document.getElementById('histSuggestions').style.display = 'none';
+}
+
+// Cerrar sugerencias al hacer clic fuera
+document.addEventListener('click', e => {
+  if (!e.target.closest('#posCustomer') && !e.target.closest('#customerSuggestions'))
+    document.getElementById('customerSuggestions').style.display = 'none';
+  if (!e.target.closest('#histSearch') && !e.target.closest('#histSuggestions'))
+    document.getElementById('histSuggestions') && (document.getElementById('histSuggestions').style.display = 'none');
+});
+
+// ─── REPORTE PDF POR CLIENTA ──────────────────────────────────────────────────
+function generarReporteClientaPDF() {
+  const nombre = (document.getElementById('histSearch')?.value || '').trim();
+  if (!nombre) { toast('Escribe el nombre de la clienta primero', 'error'); return; }
+
+  const ventasCliente = sales.filter(s =>
+    s.customer.toLowerCase().includes(nombre.toLowerCase())
+  ).sort((a,b) => new Date(a.date) - new Date(b.date));
+
+  if (!ventasCliente.length) {
+    toast('Sin ventas para "' + nombre + '"', 'error');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'letter', orientation:'portrait' });
+  const W = 216, PL = 20, PR = 20;
+  let y = 20;
+  const ln = (h=5) => { y += h; };
+
+  // ── Encabezado empresa ──
+  doc.setFontSize(20); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+  doc.text(cfg.bizName || 'MI NEGOCIO', W/2, y, {align:'center'}); ln(8);
+  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+  if (cfg.address) { doc.text(cfg.address, W/2, y, {align:'center'}); ln(5); }
+  if (cfg.phone)   { doc.text('Tel: ' + cfg.phone, W/2, y, {align:'center'}); ln(5); }
+  doc.setFontSize(9); doc.setTextColor(120,120,120);
+  const ahora = new Date();
+  doc.text('Reporte generado el ' +
+    ahora.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) +
+    ' a las ' + ahora.toLocaleTimeString('es-MX'), W/2, y, {align:'center'});
+  doc.setTextColor(0,0,0); ln(8);
+  doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(6);
+
+  // ── Datos de la clienta ──
+  doc.setFillColor(240,245,255);
+  doc.setDrawColor(29,78,216); doc.setLineWidth(0.3);
+  doc.roundedRect(PL, y, W-PL-PR, 22, 3, 3, 'FD');
+  doc.setDrawColor(0);
+  y += 5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(29,78,216);
+  doc.text('HISTORIAL DE COMPRAS', PL+6, y); ln(6);
+  doc.setFontSize(11); doc.setTextColor(0,0,0);
+  doc.text('Clienta: ' + ventasCliente[0].customer, PL+6, y);
+
+  const primerCompra = new Date(ventasCliente[0].date).toLocaleDateString('es-MX');
+  const ultimaCompra = new Date(ventasCliente[ventasCliente.length-1].date).toLocaleDateString('es-MX');
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(80,80,80);
+  doc.text('Desde: ' + primerCompra + '  |  Ultima compra: ' + ultimaCompra, W-PR, y, {align:'right'});
+  y += 12;
+  doc.setLineWidth(0.4); doc.line(PL, y, W-PR, y); ln(6);
+
+  // ── Encabezado tabla ──
+  doc.setFillColor(25,55,170);
+  doc.rect(PL, y-4, W-PL-PR, 10, 'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('FECHA',      PL+4,    y+2);
+  doc.text('FOLIO',      PL+45,   y+2);
+  doc.text('PRODUCTOS',  PL+75,   y+2);
+  doc.text('TOTAL',      W-PR,    y+2, {align:'right'});
+  ln(10); doc.setTextColor(0,0,0);
+
+  let totalAcumulado = 0;
+  let fila = 0;
+
+  ventasCliente.forEach(s => {
+    if (y > 245) {
+      doc.addPage(); y = 20;
+      // Re-encabezado tabla en nueva página
+      doc.setFillColor(25,55,170);
+      doc.rect(PL, y-4, W-PL-PR, 10, 'F');
+      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      doc.text('FECHA', PL+4, y+2); doc.text('FOLIO', PL+45, y+2);
+      doc.text('PRODUCTOS', PL+75, y+2); doc.text('TOTAL', W-PR, y+2, {align:'right'});
+      ln(10); doc.setTextColor(0,0,0);
+    }
+
+    if (fila % 2 === 0) {
+      doc.setFillColor(248,250,255);
+      doc.rect(PL, y-3, W-PL-PR, 9, 'F');
+    }
+    fila++;
+
+    const fecha = new Date(s.date).toLocaleDateString('es-MX');
+    const folio = '#' + s.id.slice(-6).toUpperCase();
+    const prods = s.items.map(i => i.name + ' x' + i.qty).join(', ');
+    const prodsTxt = prods.length > 55 ? prods.slice(0,55)+'...' : prods;
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+    doc.text(fecha,    PL+4,  y);
+    doc.setTextColor(100,100,100);
+    doc.text(folio,    PL+45, y);
+    doc.text(prodsTxt, PL+75, y);
+    doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(fmt(s.total), W-PR, y, {align:'right'});
+
+    doc.setDrawColor(210,215,230); doc.setLineWidth(0.1);
+    doc.line(PL, y+4, W-PR, y+4); doc.setDrawColor(0);
+
+    totalAcumulado += s.total;
+    ln(9);
+  });
+
+  // ── Total acumulado ──
+  ln(3);
+  doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(4);
+  doc.setFillColor(240,255,240); doc.setDrawColor(22,163,74); doc.setLineWidth(0.3);
+  doc.roundedRect(W-PR-90, y, 90, 16, 3, 3, 'FD'); doc.setDrawColor(0);
+  y += 4;
+  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(22,163,74);
+  doc.text('Total de ' + ventasCliente.length + ' compras:', W-PR-85, y+3);
+  doc.setFontSize(14); doc.setFont('helvetica','bold');
+  doc.text(fmt(totalAcumulado), W-PR-4, y+4, {align:'right'});
+  doc.setTextColor(0,0,0); ln(20);
+
+  // ── Pie ──
+  doc.setTextColor(160,160,160); doc.setFont('helvetica','italic'); doc.setFontSize(8);
+  doc.text(cfg.bizName + ' — Reporte de clienta generado automaticamente', W/2, 272, {align:'center'});
+
+  doc.save('reporte_' + safe(ventasCliente[0].customer) + '.pdf');
+  toast('Reporte de ' + ventasCliente[0].customer + ' descargado');
+}
+
+// ─── ALERTAS DE STOCK ─────────────────────────────────────────────────────────
   const lowItems = updatedProducts.filter(p => p.stock > 0 && p.stock <= 10);
   if (!lowItems.length) return;
 
