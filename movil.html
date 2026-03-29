@@ -182,54 +182,45 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 <!-- ═══ TAB: VENTA ═══ -->
 <div id="tab-venta" class="content" style="display:none" id="ventaContent">
 
-  <!-- Nombre de la clienta -->
   <div class="input-group">
     <label>👤 Nombre de la clienta</label>
     <input class="input" id="ventaCliente" placeholder="Ej: María García" style="font-size:16px">
   </div>
 
-  <!-- Cámara escáner persistente -->
+  <!-- Escáner persistente -->
   <div class="card" style="margin-bottom:12px;overflow:hidden">
     <div style="background:var(--blue);padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
-      <span style="color:white;font-weight:700;font-size:13px">📷 Escáner de productos</span>
+      <span style="color:white;font-weight:700;font-size:13px">📷 Escáner</span>
       <div style="display:flex;gap:8px">
         <button id="btnAbrirCamara" onclick="abrirCamaraVenta()"
-          style="background:white;color:var(--blue);border:none;border-radius:6px;padding:6px 12px;font-weight:700;font-size:12px;cursor:pointer;touch-action:manipulation">
+          style="background:white;color:var(--blue);border:none;border-radius:6px;padding:6px 14px;font-weight:800;font-size:13px;cursor:pointer;touch-action:manipulation">
           ▶ Abrir cámara
         </button>
         <button id="btnCerrarCamara" onclick="cerrarCamaraVenta()" style="display:none;
-          background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.5);border-radius:6px;padding:6px 12px;font-weight:700;font-size:12px;cursor:pointer;touch-action:manipulation">
+          background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.5);
+          border-radius:6px;padding:6px 12px;font-weight:700;font-size:12px;cursor:pointer;touch-action:manipulation">
           ✕ Cerrar
         </button>
       </div>
     </div>
-    <!-- Video de cámara -->
     <div id="ventaCamaraBox" style="display:none;background:#000;position:relative">
       <video id="ventaVideo" style="width:100%;height:220px;object-fit:cover;display:block" autoplay playsinline muted></video>
       <canvas id="ventaCanvas" style="display:none"></canvas>
-      <!-- Guía de escaneo -->
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:120px;border:2px solid rgba(255,255,255,0.7);border-radius:8px;pointer-events:none"></div>
-      <div style="position:absolute;bottom:8px;left:0;right:0;text-align:center;color:rgba(255,255,255,0.8);font-size:11px;font-weight:600">
-        Apunta al código de barras
-      </div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:220px;height:110px;border:2px solid rgba(255,255,255,0.75);border-radius:8px;pointer-events:none"></div>
+      <div style="position:absolute;bottom:8px;left:0;right:0;text-align:center;color:rgba(255,255,255,0.85);font-size:11px;font-weight:600">Apunta al código de barras</div>
     </div>
-    <!-- Último producto escaneado -->
-    <div id="ultimoEscaneado" style="display:none;padding:10px 14px;background:#f0fff4;border-top:1px solid #bbf7d0">
-      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;margin-bottom:3px">Ultimo escaneado</div>
-      <div id="ultimoEscaneadoTxt" style="font-weight:700;color:var(--green);font-size:14px"></div>
+    <div id="ultimoEscaneado" style="display:none;padding:10px 14px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;margin-bottom:2px">Último escaneado</div>
+      <div id="ultimoEscaneadoTxt" style="font-weight:700;font-size:14px;color:var(--green)"></div>
     </div>
   </div>
 
-  <!-- Búsqueda manual -->
   <div class="input-group">
-    <label>🔍 O busca manualmente</label>
-    <div style="display:flex;gap:8px">
-      <input class="input" id="ventaSearch" placeholder="Nombre o código..." oninput="searchVenta()" style="flex:1">
-    </div>
+    <label>🔍 O busca por nombre</label>
+    <input class="input" id="ventaSearch" placeholder="Nombre del producto..." oninput="searchVenta()">
     <div id="ventaSearchResults" style="display:none;background:white;border:1px solid var(--border);border-radius:8px;margin-top:6px;max-height:200px;overflow-y:auto"></div>
   </div>
 
-  <!-- Carrito -->
   <div class="card">
     <div class="card-title">🛒 Carrito</div>
     <div id="cartList">
@@ -396,14 +387,46 @@ function showTab(tab) {
   document.querySelectorAll('.nav button').forEach((btn, i) => {
     btn.classList.toggle('active', ['scanner','inventario','venta','notas','agregar'][i] === tab);
   });
-  // Cerrar cámara general al cambiar pestaña
   stopScan();
-  // Cerrar cámara de venta al salir de venta
   if (tab !== 'venta') cerrarCamaraVenta();
   if (tab === 'venta') updateCartUI();
   if (tab === 'agregar') renderUltimosProductos();
 }
 
+// ─── SONIDO DE ESCÁNER (Web Audio API) ───────────────────────────────────────
+function beepScanner(ok = true) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ok) {
+      // Beep de supermercado: tono corto y limpio
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1800, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.8, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+    } else {
+      // Beep de error: tono más grave y doble
+      [0, 0.15].forEach(delay => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(400, ctx.currentTime + delay);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.12);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.12);
+      });
+    }
+  } catch(e) {}
+}
 
 // ─── CÁMARA PERSISTENTE PARA VENTA ───────────────────────────────────────────
 let _ventaStream = null;
@@ -439,10 +462,10 @@ function cerrarCamaraVenta() {
   }
   const box = document.getElementById('ventaCamaraBox');
   if (box) box.style.display = 'none';
-  const btnAbrir = document.getElementById('btnAbrirCamara');
-  if (btnAbrir) btnAbrir.style.display = '';
-  const btnCerrar = document.getElementById('btnCerrarCamara');
-  if (btnCerrar) btnCerrar.style.display = 'none';
+  const btnA = document.getElementById('btnAbrirCamara');
+  if (btnA) btnA.style.display = '';
+  const btnC = document.getElementById('btnCerrarCamara');
+  if (btnC) btnC.style.display = 'none';
   const ult = document.getElementById('ultimoEscaneado');
   if (ult) ult.style.display = 'none';
 }
@@ -459,10 +482,10 @@ function ventaScanFrame() {
     detector.detect(video).then(codes => {
       if (codes.length > 0 && _ventaScanning) {
         const code = codes[0].rawValue;
-        const now = Date.now();
-        // Evitar duplicados: mismo código en menos de 2 segundos se ignora
+        const now  = Date.now();
+        // Ignorar mismo código en menos de 2 segundos
         if (code !== _lastCode || now - _lastCodeTime > 2000) {
-          _lastCode = code;
+          _lastCode     = code;
           _lastCodeTime = now;
           handleVentaScan(code);
         }
@@ -475,22 +498,37 @@ function ventaScanFrame() {
 }
 
 function handleVentaScan(code) {
-  // Si es QR de nota ignorar
+  // Si es QR de nota, ignorar en modo venta
   if (code.includes('Folio:') || code.includes('ID:') || code.includes('TOTAL:')) {
+    beepScanner(false);
     toast('QR de nota — usa la pestana Notas', 'info');
     return;
   }
-  const prod = products.find(p => p.barcode && p.barcode === code);
+
+  const prod   = products.find(p => p.barcode && p.barcode === code);
   const ultEl  = document.getElementById('ultimoEscaneado');
   const ultTxt = document.getElementById('ultimoEscaneadoTxt');
+
   if (prod) {
+    beepScanner(true); // ✅ Beep de éxito
+    if (navigator.vibrate) navigator.vibrate(80);
     addToCartMobile(prod.id);
     if (ultEl)  ultEl.style.display = '';
-    if (ultTxt) { ultTxt.style.color = 'var(--green)'; ultTxt.textContent = '+ ' + prod.name + ' — $' + prod.sellPrice.toFixed(2); }
-    if (navigator.vibrate) navigator.vibrate(80);
+    if (ultTxt) {
+      ultTxt.style.color = 'var(--green)';
+      ultTxt.textContent = '+ ' + prod.name + ' — $' + prod.sellPrice.toFixed(2);
+    }
   } else {
+    beepScanner(false); // ❌ Beep de error
+    if (navigator.vibrate) navigator.vibrate([100,50,100]);
     if (ultEl)  ultEl.style.display = '';
-    if (ultTxt) { ultTxt.style.color = 'var(--red)'; ultTxt.textContent = 'No encontrado: ' + code; }
+    if (ultTxt) {
+      ultTxt.style.color = 'var(--red)';
+      ultTxt.textContent = 'No encontrado: ' + code;
+      setTimeout(() => {
+        if (ultTxt) ultTxt.style.color = 'var(--green)';
+      }, 2000);
+    }
     toast('Producto no encontrado en inventario', 'error');
   }
 }
