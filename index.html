@@ -250,7 +250,9 @@ return QRCode;
         <div>
           <div class="input-group" style="margin-bottom:12px">
             <label>👤 Nombre de la clienta</label>
-            <input class="input" id="posCustomer" placeholder="Ej: María García" oninput="updateCartUI()">
+            <input class="input" id="posCustomer" placeholder="Ej: María García"
+              oninput="updateCartUI()"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('posSearch').focus();}">
           </div>
 
           <div class="input-group">
@@ -807,6 +809,8 @@ function showView(v) {
   if (v === 'cut')       renderCut();
   if (v === 'history')   renderHistory();
   if (v === 'settings')  loadSettings();
+  // Al entrar a VENTA el cursor va al nombre de la clienta
+  if (v === 'pos') setTimeout(() => document.getElementById('posCustomer').focus(), 50);
 }
 
 // ─── TOAST ────────────────────────────────────────────────────────────────────
