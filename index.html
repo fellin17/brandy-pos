@@ -250,13 +250,7 @@ return QRCode;
         <div>
           <div class="input-group" style="margin-bottom:12px">
             <label>👤 Nombre de la clienta</label>
-            <div style="position:relative">
-              <input class="input" id="posCustomer" placeholder="Ej: María García"
-                oninput="updateCartUI();customerAutocomplete(this.value)"
-                onkeydown="customerKeydown(event)"
-                autocomplete="off">
-              <div id="customerSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto"></div>
-            </div>
+            <input class="input" id="posCustomer" placeholder="Ej: María García" oninput="updateCartUI()">
           </div>
 
           <div class="input-group">
@@ -353,23 +347,26 @@ return QRCode;
         </div>
       </div>
 
-      <!-- Filtro por cliente -->
-      <div style="margin-bottom:8px;position:relative">
-        <div style="display:flex;gap:8px">
+      <!-- Buscador de clienta con autocompletado -->
+      <div style="margin-bottom:12px;position:relative">
+        <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">👤 Buscar clienta</label>
+        <div style="display:flex;gap:8px;align-items:center">
           <div style="flex:1;position:relative">
             <input class="input" id="histSearch"
-              placeholder="🔍 Filtrar o buscar clienta..."
+              placeholder="Escribe el nombre de la clienta..."
               oninput="renderHistory();histAutocomplete(this.value)"
               onkeydown="histKeydown(event)"
               autocomplete="off">
-            <div id="histSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:160px;overflow-y:auto"></div>
+            <div id="histSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:200;box-shadow:0 4px 16px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto"></div>
           </div>
-          <button onclick="generarReporteClientaPDF()" class="btn btn-primary btn-sm" title="Reporte PDF de la clienta buscada">📄 Reporte</button>
-          <button id="histClearBtn" onclick="document.getElementById('histSearch').value='';renderHistory()" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:700">✕</button>
+          <button id="histClearBtn" onclick="document.getElementById('histSearch').value='';renderHistory();"
+            style="display:none;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:700;font-size:13px;color:var(--muted)">
+            ✕ Limpiar
+          </button>
         </div>
       </div>
 
-      <!-- Resumen del cliente filtrado -->
+      <!-- Resumen y botón reporte — aparece solo cuando hay clienta filtrada -->
       <div id="histClientSummary" style="display:none;margin-bottom:12px"></div>
 
       <div id="historyList"></div>
@@ -641,7 +638,6 @@ let cfg = {
   msg:'¡Gracias por su compra! Vuelva pronto 😊',
   logo:'🏪', printerTicket:'', printerLabel:'',
   labelNameSize:10, labelPriceSize:16,
-  customers: [],
 };
 let cart = [], editProdId = null;
 
@@ -1131,11 +1127,6 @@ function saveSaleFromCart() {
     total, profit, inCut: false,
   };
 
-  // Guardar clienta en lista de clientas conocidas
-  if (customer && !cfg.customers.includes(customer)) {
-    cfg.customers.push(customer);
-  }
-
   // Descontar stock
   products = products.map(p => {
     const ci = cart.find(i => i.id === p.id);
@@ -1329,7 +1320,7 @@ function renderHistory() {
   const list = document.getElementById('historyList');
   const q = (document.getElementById('histSearch')?.value || '').trim().toLowerCase();
   const clearBtn = document.getElementById('histClearBtn');
-  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+  if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
 
   const filtered = q
     ? sales.filter(s => s.customer.toLowerCase().includes(q))
@@ -1339,30 +1330,42 @@ function renderHistory() {
     ? `${filtered.length} de ${sales.length} ventas`
     : `${sales.length} ventas`;
 
-  // Resumen del cliente filtrado
+  // Resumen del cliente filtrado + botón de reporte
   const summaryEl = document.getElementById('histClientSummary');
   if (q && filtered.length > 0) {
-    const totalCliente   = filtered.reduce((s,x) => s+x.total, 0);
+    const totalCliente    = filtered.reduce((s,x) => s+x.total, 0);
     const gananciaCliente = filtered.reduce((s,x) => s+x.profit, 0);
-    const clientes = [...new Set(filtered.map(s => s.customer))];
+    const clientes        = [...new Set(filtered.map(s => s.customer))];
+    const nombreCliente   = clientes[0];
+    const primeraCompra   = new Date(Math.min(...filtered.map(s => new Date(s.date)))).toLocaleDateString('es-MX');
+
     summaryEl.style.display = '';
     summaryEl.innerHTML = `
-      <div style="background:var(--accent-light);border:1px solid var(--accent);border-radius:8px;padding:12px 16px">
-        <div style="font-weight:700;color:var(--accent);margin-bottom:8px;font-size:13px">
-          📊 Resumen — ${clientes.join(', ')}
+      <div style="background:var(--accent-light);border:1.5px solid var(--accent);border-radius:10px;overflow:hidden">
+        <!-- Encabezado con nombre y botón -->
+        <div style="background:var(--accent);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="color:white;font-weight:800;font-size:15px">👤 ${nombreCliente}</div>
+            <div style="color:rgba(255,255,255,0.8);font-size:11px">Clienta desde ${primeraCompra}</div>
+          </div>
+          <button onclick="generarReporteClientaPDF()"
+            style="background:white;color:var(--accent);border:none;border-radius:8px;padding:10px 18px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap">
+            📄 Generar Reporte
+          </button>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
-          <div>
-            <div style="font-size:20px;font-weight:800;color:var(--accent)">${filtered.length}</div>
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Compras</div>
+        <!-- Estadísticas -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;text-align:center;padding:14px 0">
+          <div style="border-right:1px solid rgba(29,78,216,0.2)">
+            <div style="font-size:22px;font-weight:900;color:var(--accent)">${filtered.length}</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">Compras totales</div>
+          </div>
+          <div style="border-right:1px solid rgba(29,78,216,0.2)">
+            <div style="font-size:22px;font-weight:900;color:var(--orange)">${fmt(totalCliente)}</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">Total gastado</div>
           </div>
           <div>
-            <div style="font-size:20px;font-weight:800;color:var(--orange)">${fmt(totalCliente)}</div>
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Total gastado</div>
-          </div>
-          <div>
-            <div style="font-size:20px;font-weight:800;color:var(--green)">${fmt(gananciaCliente)}</div>
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Tu ganancia</div>
+            <div style="font-size:22px;font-weight:900;color:var(--green)">${fmt(gananciaCliente)}</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">Tu ganancia</div>
           </div>
         </div>
       </div>`;
@@ -1416,7 +1419,6 @@ function renderHistory() {
       </div>
     </div>`).join('');
 
-  // Generar QRs después de que el DOM esté listo
   setTimeout(renderQRCodes, 50);
 }
 
@@ -1766,76 +1768,60 @@ function escJs(s)  { return String(s).replace(/'/g,"\\'"); }
 function safe(s)   { return String(s).replace(/[^a-zA-Z0-9_\-]/g,'_'); }
 
 // ─── ALERTA DE STOCK BAJO ─────────────────────────────────────────────────────
-// ─── AUTOCOMPLETADO DE CLIENTAS ───────────────────────────────────────────────
+// ─── AUTOCOMPLETADO Y REPORTE DE CLIENTAS ─────────────────────────────────────
 function getClientasList() {
-  // Combina las de cfg.customers con las que aparecen en ventas (retrocompatible)
   const fromSales = sales.map(s => s.customer).filter(Boolean);
-  const all = [...new Set([...(cfg.customers||[]), ...fromSales])].sort();
-  return all;
-}
-
-function customerAutocomplete(val) {
-  const box = document.getElementById('customerSuggestions');
-  if (!val || val.length < 2) { box.style.display = 'none'; return; }
-  const q = val.toLowerCase();
-  const matches = getClientasList().filter(c => c.toLowerCase().includes(q) && c.toLowerCase() !== q);
-  if (!matches.length) { box.style.display = 'none'; return; }
-  box.innerHTML = matches.map(c => `
-    <div onclick="selectCustomer('${escJs(c)}')" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);transition:background .1s"
-      onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background=''">
-      👤 ${c}
-    </div>`).join('');
-  box.style.display = 'block';
-}
-
-function selectCustomer(name) {
-  document.getElementById('posCustomer').value = name;
-  document.getElementById('customerSuggestions').style.display = 'none';
-  updateCartUI();
-}
-
-function customerKeydown(e) {
-  if (e.key === 'Escape') {
-    document.getElementById('customerSuggestions').style.display = 'none';
-  }
+  const fromCfg   = cfg.customers || [];
+  return [...new Set([...fromCfg, ...fromSales])].sort();
 }
 
 function histAutocomplete(val) {
   const box = document.getElementById('histSuggestions');
+  if (!box) return;
   if (!val || val.length < 2) { box.style.display = 'none'; return; }
   const q = val.toLowerCase();
   const matches = getClientasList().filter(c => c.toLowerCase().includes(q));
   if (!matches.length) { box.style.display = 'none'; return; }
   box.innerHTML = matches.map(c => `
-    <div onclick="selectHistCustomer('${escJs(c)}')" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);transition:background .1s"
-      onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background=''">
-      👤 ${c}
+    <div onclick="selectHistCustomer('${escJs(c)}')"
+      style="padding:10px 16px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"
+      onmouseover="this.style.background='var(--accent-light)'"
+      onmouseout="this.style.background=''">
+      <span style="font-size:16px">👤</span>
+      <div>
+        <div style="font-weight:700">${c}</div>
+        <div style="font-size:11px;color:var(--muted)">${sales.filter(s=>s.customer===c).length} compras registradas</div>
+      </div>
     </div>`).join('');
   box.style.display = 'block';
 }
 
 function selectHistCustomer(name) {
   document.getElementById('histSearch').value = name;
-  document.getElementById('histSuggestions').style.display = 'none';
+  const box = document.getElementById('histSuggestions');
+  if (box) box.style.display = 'none';
   renderHistory();
 }
 
 function histKeydown(e) {
-  if (e.key === 'Escape') document.getElementById('histSuggestions').style.display = 'none';
+  if (e.key === 'Escape') {
+    const box = document.getElementById('histSuggestions');
+    if (box) box.style.display = 'none';
+  }
 }
 
 // Cerrar sugerencias al hacer clic fuera
 document.addEventListener('click', e => {
-  if (!e.target.closest('#posCustomer') && !e.target.closest('#customerSuggestions'))
-    document.getElementById('customerSuggestions').style.display = 'none';
-  if (!e.target.closest('#histSearch') && !e.target.closest('#histSuggestions'))
-    document.getElementById('histSuggestions') && (document.getElementById('histSuggestions').style.display = 'none');
+  if (!e.target.closest('#histSearch') && !e.target.closest('#histSuggestions')) {
+    const box = document.getElementById('histSuggestions');
+    if (box) box.style.display = 'none';
+  }
 });
 
 // ─── REPORTE PDF POR CLIENTA ──────────────────────────────────────────────────
 function generarReporteClientaPDF() {
   const nombre = (document.getElementById('histSearch')?.value || '').trim();
-  if (!nombre) { toast('Escribe el nombre de la clienta primero', 'error'); return; }
+  if (!nombre) { toast('Busca primero a la clienta usando el campo de arriba', 'error'); return; }
 
   const ventasCliente = sales.filter(s =>
     s.customer.toLowerCase().includes(nombre.toLowerCase())
@@ -1853,45 +1839,48 @@ function generarReporteClientaPDF() {
   const ln = (h=5) => { y += h; };
 
   // ── Encabezado empresa ──
-  doc.setFontSize(20); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+  doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
   doc.text(cfg.bizName || 'MI NEGOCIO', W/2, y, {align:'center'}); ln(8);
   doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
   if (cfg.address) { doc.text(cfg.address, W/2, y, {align:'center'}); ln(5); }
   if (cfg.phone)   { doc.text('Tel: ' + cfg.phone, W/2, y, {align:'center'}); ln(5); }
   doc.setFontSize(9); doc.setTextColor(120,120,120);
   const ahora = new Date();
-  doc.text('Reporte generado el ' +
+  doc.text(
+    'Reporte generado el ' +
     ahora.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) +
-    ' a las ' + ahora.toLocaleTimeString('es-MX'), W/2, y, {align:'center'});
+    ' a las ' + ahora.toLocaleTimeString('es-MX'),
+    W/2, y, {align:'center'}
+  );
   doc.setTextColor(0,0,0); ln(8);
   doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(6);
 
   // ── Datos de la clienta ──
-  doc.setFillColor(240,245,255);
-  doc.setDrawColor(29,78,216); doc.setLineWidth(0.3);
-  doc.roundedRect(PL, y, W-PL-PR, 22, 3, 3, 'FD');
-  doc.setDrawColor(0);
-  y += 5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(29,78,216);
-  doc.text('HISTORIAL DE COMPRAS', PL+6, y); ln(6);
-  doc.setFontSize(11); doc.setTextColor(0,0,0);
-  doc.text('Clienta: ' + ventasCliente[0].customer, PL+6, y);
+  const nombreReal = ventasCliente[0].customer;
+  const primeraCompra = new Date(ventasCliente[0].date).toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'});
+  const ultimaCompra  = new Date(ventasCliente[ventasCliente.length-1].date).toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'});
 
-  const primerCompra = new Date(ventasCliente[0].date).toLocaleDateString('es-MX');
-  const ultimaCompra = new Date(ventasCliente[ventasCliente.length-1].date).toLocaleDateString('es-MX');
+  doc.setFillColor(235,242,255);
+  doc.setDrawColor(29,78,216); doc.setLineWidth(0.3);
+  doc.roundedRect(PL, y, W-PL-PR, 26, 3, 3, 'FD'); doc.setDrawColor(0);
+  y += 6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(29,78,216);
+  doc.text('HISTORIAL DE CLIENTA', PL+6, y); ln(7);
+  doc.setFontSize(11); doc.setTextColor(0,0,0);
+  doc.text('Nombre: ' + nombreReal, PL+6, y);
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(80,80,80);
-  doc.text('Desde: ' + primerCompra + '  |  Ultima compra: ' + ultimaCompra, W-PR, y, {align:'right'});
+  doc.text('Primera compra: ' + primeraCompra + '   |   Ultima compra: ' + ultimaCompra, W-PR, y, {align:'right'});
   y += 12;
-  doc.setLineWidth(0.4); doc.line(PL, y, W-PR, y); ln(6);
+  doc.setLineWidth(0.4); doc.line(PL, y, W-PR, y); ln(7);
 
   // ── Encabezado tabla ──
   doc.setFillColor(25,55,170);
-  doc.rect(PL, y-4, W-PL-PR, 10, 'F');
+  doc.rect(PL, y-4, W-PL-PR, 11, 'F');
   doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
-  doc.text('FECHA',      PL+4,    y+2);
-  doc.text('FOLIO',      PL+45,   y+2);
-  doc.text('PRODUCTOS',  PL+75,   y+2);
-  doc.text('TOTAL',      W-PR,    y+2, {align:'right'});
+  doc.text('FECHA',      PL+4,   y+3);
+  doc.text('FOLIO',      PL+46,  y+3);
+  doc.text('PRODUCTOS',  PL+78,  y+3);
+  doc.text('TOTAL',      W-PR,   y+3, {align:'right'});
   ln(10); doc.setTextColor(0,0,0);
 
   let totalAcumulado = 0;
@@ -1900,62 +1889,62 @@ function generarReporteClientaPDF() {
   ventasCliente.forEach(s => {
     if (y > 245) {
       doc.addPage(); y = 20;
-      // Re-encabezado tabla en nueva página
       doc.setFillColor(25,55,170);
-      doc.rect(PL, y-4, W-PL-PR, 10, 'F');
+      doc.rect(PL, y-4, W-PL-PR, 11, 'F');
       doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
-      doc.text('FECHA', PL+4, y+2); doc.text('FOLIO', PL+45, y+2);
-      doc.text('PRODUCTOS', PL+75, y+2); doc.text('TOTAL', W-PR, y+2, {align:'right'});
+      doc.text('FECHA', PL+4, y+3); doc.text('FOLIO', PL+46, y+3);
+      doc.text('PRODUCTOS', PL+78, y+3); doc.text('TOTAL', W-PR, y+3, {align:'right'});
       ln(10); doc.setTextColor(0,0,0);
     }
 
     if (fila % 2 === 0) {
       doc.setFillColor(248,250,255);
-      doc.rect(PL, y-3, W-PL-PR, 9, 'F');
+      doc.rect(PL, y-3, W-PL-PR, 10, 'F');
     }
     fila++;
 
-    const fecha = new Date(s.date).toLocaleDateString('es-MX');
-    const folio = '#' + s.id.slice(-6).toUpperCase();
-    const prods = s.items.map(i => i.name + ' x' + i.qty).join(', ');
-    const prodsTxt = prods.length > 55 ? prods.slice(0,55)+'...' : prods;
+    const fecha    = new Date(s.date).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const folio    = '#' + s.id.slice(-6).toUpperCase();
+    const prods    = s.items.map(i => i.name + ' x' + i.qty).join(', ');
+    const prodsTxt = prods.length > 52 ? prods.slice(0,52)+'...' : prods;
 
     doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
-    doc.text(fecha,    PL+4,  y);
+    doc.text(fecha,    PL+4,  y+1);
     doc.setTextColor(100,100,100);
-    doc.text(folio,    PL+45, y);
-    doc.text(prodsTxt, PL+75, y);
+    doc.text(folio,    PL+46, y+1);
+    doc.text(prodsTxt, PL+78, y+1);
     doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
-    doc.text(fmt(s.total), W-PR, y, {align:'right'});
+    doc.text(fmt(s.total), W-PR, y+1, {align:'right'});
 
     doc.setDrawColor(210,215,230); doc.setLineWidth(0.1);
-    doc.line(PL, y+4, W-PR, y+4); doc.setDrawColor(0);
+    doc.line(PL, y+5, W-PR, y+5); doc.setDrawColor(0);
 
     totalAcumulado += s.total;
     ln(9);
   });
 
   // ── Total acumulado ──
-  ln(3);
-  doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(4);
-  doc.setFillColor(240,255,240); doc.setDrawColor(22,163,74); doc.setLineWidth(0.3);
-  doc.roundedRect(W-PR-90, y, 90, 16, 3, 3, 'FD'); doc.setDrawColor(0);
-  y += 4;
-  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(22,163,74);
-  doc.text('Total de ' + ventasCliente.length + ' compras:', W-PR-85, y+3);
-  doc.setFontSize(14); doc.setFont('helvetica','bold');
+  ln(4);
+  doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(5);
+
+  doc.setFillColor(235,255,240); doc.setDrawColor(22,163,74); doc.setLineWidth(0.3);
+  doc.roundedRect(PL, y, W-PL-PR, 18, 3, 3, 'FD'); doc.setDrawColor(0);
+  y += 5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(22,163,74);
+  doc.text('Total acumulado de ' + ventasCliente.length + ' compras realizadas:', PL+6, y+3);
+  doc.setFontSize(15); doc.setFont('helvetica','bold');
   doc.text(fmt(totalAcumulado), W-PR-4, y+4, {align:'right'});
-  doc.setTextColor(0,0,0); ln(20);
+  doc.setTextColor(0,0,0); ln(22);
 
   // ── Pie ──
   doc.setTextColor(160,160,160); doc.setFont('helvetica','italic'); doc.setFontSize(8);
-  doc.text(cfg.bizName + ' — Reporte de clienta generado automaticamente', W/2, 272, {align:'center'});
+  doc.text((cfg.bizName||'MI NEGOCIO') + ' — Reporte de clienta generado automaticamente', W/2, 272, {align:'center'});
 
-  doc.save('reporte_' + safe(ventasCliente[0].customer) + '.pdf');
-  toast('Reporte de ' + ventasCliente[0].customer + ' descargado');
+  doc.save('reporte_' + safe(nombreReal) + '_' + ahora.toLocaleDateString('es-MX').replace(/\//g,'-') + '.pdf');
+  toast('Reporte de ' + nombreReal + ' descargado');
 }
 
-// ─── ALERTAS DE STOCK ─────────────────────────────────────────────────────────
+function checkStockAlerts(updatedProducts) {
   const lowItems = updatedProducts.filter(p => p.stock > 0 && p.stock <= 10);
   if (!lowItems.length) return;
 
