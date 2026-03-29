@@ -347,26 +347,15 @@ return QRCode;
         </div>
       </div>
 
-      <!-- Buscador de clienta con autocompletado -->
-      <div style="margin-bottom:12px;position:relative">
-        <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">👤 Buscar clienta</label>
-        <div style="display:flex;gap:8px;align-items:center">
-          <div style="flex:1;position:relative">
-            <input class="input" id="histSearch"
-              placeholder="Escribe el nombre de la clienta..."
-              oninput="renderHistory();histAutocomplete(this.value)"
-              onkeydown="histKeydown(event)"
-              autocomplete="off">
-            <div id="histSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:200;box-shadow:0 4px 16px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto"></div>
-          </div>
-          <button id="histClearBtn" onclick="document.getElementById('histSearch').value='';renderHistory();"
-            style="display:none;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:700;font-size:13px;color:var(--muted)">
-            ✕ Limpiar
-          </button>
+      <!-- Filtro por cliente -->
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <div style="flex:1;min-width:200px;position:relative">
+          <input class="input" id="histSearch" placeholder="🔍 Filtrar por nombre de clienta..." oninput="renderHistory()" style="padding-right:36px">
+          <button id="histClearBtn" onclick="document.getElementById('histSearch').value='';renderHistory()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">×</button>
         </div>
       </div>
 
-      <!-- Resumen y botón reporte — aparece solo cuando hay clienta filtrada -->
+      <!-- Resumen del cliente filtrado -->
       <div id="histClientSummary" style="display:none;margin-bottom:12px"></div>
 
       <div id="historyList"></div>
@@ -397,28 +386,122 @@ return QRCode;
     <div id="view-settings" style="display:none">
       <div style="font-weight:700;font-size:16px;margin-bottom:16px">⚙️ Configuración</div>
 
+      <!-- ── DATOS DEL NEGOCIO ── -->
       <div class="settings-section">
         <h3>🏪 Datos del negocio</h3>
-        <div class="input-group">
-          <label>Nombre del negocio</label>
-          <input class="input" id="cfgBizName" placeholder="MI NEGOCIO">
+        <div class="form-grid-2">
+          <div class="input-group">
+            <label>Nombre del negocio *</label>
+            <input class="input" id="cfgBizName" placeholder="MI NEGOCIO">
+          </div>
+          <div class="input-group">
+            <label>RFC</label>
+            <input class="input" id="cfgRfc" placeholder="XAXX010101000">
+          </div>
         </div>
-        <div class="input-group">
-          <label>Teléfono (aparece en el ticket)</label>
-          <input class="input" id="cfgPhone" placeholder="55 1234 5678">
-        </div>
-        <div class="input-group">
-          <label>Dirección (aparece en el ticket)</label>
-          <input class="input" id="cfgAddress" placeholder="Calle, Colonia, Ciudad">
+        <div class="form-grid-2">
+          <div class="input-group">
+            <label>Teléfono</label>
+            <input class="input" id="cfgPhone" placeholder="55 1234 5678">
+          </div>
+          <div class="input-group">
+            <label>Dirección</label>
+            <input class="input" id="cfgAddress" placeholder="Calle, Colonia, Ciudad">
+          </div>
         </div>
         <div class="input-group">
           <label>Mensaje de despedida en el ticket</label>
-          <input class="input" id="cfgMsg" placeholder="¡Gracias por su compra! Vuelva pronto 😊">
+          <input class="input" id="cfgMsg" placeholder="¡Gracias por su compra! Vuelva pronto">
         </div>
+      </div>
+
+      <!-- ── DISEÑO DEL ENCABEZADO ── -->
+      <div class="settings-section">
+        <h3>🎨 Diseño del encabezado del ticket</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">
+          Personaliza cómo se verá el membrete en todos tus tickets PDF.
+        </p>
+
+        <!-- Logo imagen -->
         <div class="input-group">
-          <label>Logo (emoji o símbolo)</label>
-          <input class="input" id="cfgLogo" placeholder="🏪" maxlength="4">
+          <label>Logo del negocio (JPG o PNG — aparece en el ticket)</label>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <div id="logoPreviewBox" style="width:80px;height:80px;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--surface2);flex-shrink:0;overflow:hidden">
+              <span id="logoPreviewEmpty" style="font-size:11px;color:var(--muted);text-align:center">Sin<br>logo</span>
+              <img id="logoPreviewImg" style="display:none;width:100%;height:100%;object-fit:contain">
+            </div>
+            <div style="flex:1;min-width:180px">
+              <input type="file" id="cfgLogoFile" accept="image/png,image/jpeg,image/jpg"
+                onchange="handleLogoUpload(this)" style="display:none">
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('cfgLogoFile').click()"
+                style="margin-bottom:8px;width:100%">📁 Seleccionar imagen</button>
+              <button class="btn btn-ghost btn-sm" onclick="quitarLogo()"
+                id="btnQuitarLogo" style="display:none;width:100%;color:var(--red)">🗑️ Quitar logo</button>
+              <div style="font-size:11px;color:var(--muted);margin-top:6px">
+                Recomendado: fondo blanco, 200×200px o más
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- Estilo del nombre -->
+        <div class="input-group">
+          <label>Estilo del nombre del negocio</label>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal">
+              <input type="checkbox" id="cfgNameBold" checked onchange="previewHeader()"> <strong>Negrita</strong>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal">
+              <input type="checkbox" id="cfgNameItalic" onchange="previewHeader()"> <em>Cursiva</em>
+            </label>
+          </div>
+        </div>
+
+        <!-- Tamaño fuente nombre -->
+        <div class="input-group">
+          <label>Tamaño del nombre del negocio
+            <span id="valNameSize" style="color:var(--accent);font-weight:800;margin-left:6px">22pt</span>
+          </label>
+          <input type="range" id="cfgHeaderNameSize" min="12" max="36" step="1" value="22"
+            oninput="previewHeader()"
+            style="width:100%;accent-color:var(--accent)">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)">
+            <span>Pequeño</span><span>Grande</span>
+          </div>
+        </div>
+
+        <!-- Tamaño fuente datos -->
+        <div class="input-group">
+          <label>Tamaño de datos (teléfono, dirección, RFC)
+            <span id="valDataSize" style="color:var(--accent);font-weight:800;margin-left:6px">10pt</span>
+          </label>
+          <input type="range" id="cfgHeaderDataSize" min="7" max="16" step="1" value="10"
+            oninput="previewHeader()"
+            style="width:100%;accent-color:var(--accent)">
+        </div>
+
+        <!-- Alineación -->
+        <div class="input-group">
+          <label>Alineación del encabezado</label>
+          <div style="display:flex;gap:8px">
+            <button id="alignLeft"   onclick="setAlign('left')"
+              style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface2);cursor:pointer;font-size:16px">⬅ Izquierda</button>
+            <button id="alignCenter" onclick="setAlign('center')"
+              style="flex:1;padding:10px;border:1.5px solid var(--accent);border-radius:8px;background:var(--accent-light);cursor:pointer;font-size:16px">⬛ Centro</button>
+            <button id="alignRight"  onclick="setAlign('right')"
+              style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface2);cursor:pointer;font-size:16px">➡ Derecha</button>
+          </div>
+        </div>
+
+        <!-- Preview del encabezado -->
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">
+            Vista previa del encabezado
+          </div>
+          <div id="headerPreview" style="border:1.5px solid var(--border);border-radius:8px;padding:16px;background:white;min-height:80px">
+          </div>
+        </div>
+
         <button class="btn btn-primary" onclick="saveSettings()">💾 Guardar configuración</button>
       </div>
 
@@ -634,10 +717,17 @@ const DB = {
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let products = [], sales = [], cuts = [];
 let cfg = {
-  bizName:'MI NEGOCIO', phone:'', address:'',
+  bizName:'MI NEGOCIO', phone:'', address:'', rfc:'',
   msg:'¡Gracias por su compra! Vuelva pronto 😊',
   logo:'🏪', printerTicket:'', printerLabel:'',
   labelNameSize:10, labelPriceSize:16,
+  customers:[],
+  headerLogo:'',         // base64 de imagen de logo
+  headerNameSize:22,     // tamaño fuente nombre empresa
+  headerNameBold:true,   // negrita nombre empresa
+  headerNameItalic:false,// cursiva nombre empresa
+  headerDataSize:10,     // tamaño datos (tel, dir, rfc)
+  headerAlign:'center',  // alineación: center, left, right
 };
 let cart = [], editProdId = null;
 
@@ -1032,13 +1122,37 @@ function generateTicketPDF(sale) {
   let y = 20;
   const ln = (h=5) => { y += h; };
 
-  // Encabezado
-  doc.setFontSize(22); doc.setFont('helvetica','bold');
-  doc.text(cfg.bizName || 'MI NEGOCIO', W/2, y, {align:'center'}); ln(8);
-  doc.setFontSize(10); doc.setFont('helvetica','normal');
-  if (cfg.address) { doc.text(cfg.address, W/2, y, {align:'center'}); ln(5); }
-  if (cfg.phone)   { doc.text('Tel: ' + cfg.phone, W/2, y, {align:'center'}); ln(5); }
-  ln(2);
+  // ── Encabezado configurable ──
+  const hAlign    = cfg.headerAlign    || 'center';
+  const nameSize  = cfg.headerNameSize || 22;
+  const dataSize  = cfg.headerDataSize || 10;
+  const nameBold  = cfg.headerNameBold  !== false;
+  const nameItal  = cfg.headerNameItalic === true;
+  const pdfAlign  = hAlign === 'left' ? PL : hAlign === 'right' ? W-PR : W/2;
+  const jAlign    = hAlign === 'left' ? 'left' : hAlign === 'right' ? 'right' : 'center';
+
+  // Logo imagen
+  if (cfg.headerLogo) {
+    try {
+      const logoSize = 28;
+      const logoX = hAlign === 'center' ? W/2 - logoSize/2 : hAlign === 'right' ? W-PR-logoSize : PL;
+      doc.addImage(cfg.headerLogo, 'JPEG', logoX, y, logoSize, logoSize);
+      ln(logoSize + 4);
+    } catch {}
+  }
+
+  // Nombre del negocio
+  const nameFont = (nameBold ? 'bold' : 'normal') + (nameItal ? 'italic' : '');
+  const jsPdfFont = nameBold && nameItal ? 'bolditalic' : nameBold ? 'bold' : nameItal ? 'italic' : 'normal';
+  doc.setFontSize(nameSize); doc.setFont('helvetica', jsPdfFont);
+  doc.text(cfg.bizName || 'MI NEGOCIO', pdfAlign, y, {align: jAlign}); ln(nameSize * 0.45);
+
+  // Datos de la empresa
+  doc.setFontSize(dataSize); doc.setFont('helvetica','normal');
+  if (cfg.address) { doc.text(cfg.address, pdfAlign, y, {align: jAlign}); ln(dataSize * 0.6); }
+  if (cfg.phone)   { doc.text('Tel: ' + cfg.phone, pdfAlign, y, {align: jAlign}); ln(dataSize * 0.6); }
+  if (cfg.rfc)     { doc.text('RFC: ' + cfg.rfc, pdfAlign, y, {align: jAlign}); ln(dataSize * 0.6); }
+  ln(3);
   doc.setLineWidth(0.4); doc.line(PL, y, W-PR, y); ln(6);
 
   // Datos de la venta
@@ -1320,7 +1434,7 @@ function renderHistory() {
   const list = document.getElementById('historyList');
   const q = (document.getElementById('histSearch')?.value || '').trim().toLowerCase();
   const clearBtn = document.getElementById('histClearBtn');
-  if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
 
   const filtered = q
     ? sales.filter(s => s.customer.toLowerCase().includes(q))
@@ -1330,42 +1444,30 @@ function renderHistory() {
     ? `${filtered.length} de ${sales.length} ventas`
     : `${sales.length} ventas`;
 
-  // Resumen del cliente filtrado + botón de reporte
+  // Resumen del cliente filtrado
   const summaryEl = document.getElementById('histClientSummary');
   if (q && filtered.length > 0) {
-    const totalCliente    = filtered.reduce((s,x) => s+x.total, 0);
+    const totalCliente   = filtered.reduce((s,x) => s+x.total, 0);
     const gananciaCliente = filtered.reduce((s,x) => s+x.profit, 0);
-    const clientes        = [...new Set(filtered.map(s => s.customer))];
-    const nombreCliente   = clientes[0];
-    const primeraCompra   = new Date(Math.min(...filtered.map(s => new Date(s.date)))).toLocaleDateString('es-MX');
-
+    const clientes = [...new Set(filtered.map(s => s.customer))];
     summaryEl.style.display = '';
     summaryEl.innerHTML = `
-      <div style="background:var(--accent-light);border:1.5px solid var(--accent);border-radius:10px;overflow:hidden">
-        <!-- Encabezado con nombre y botón -->
-        <div style="background:var(--accent);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-          <div>
-            <div style="color:white;font-weight:800;font-size:15px">👤 ${nombreCliente}</div>
-            <div style="color:rgba(255,255,255,0.8);font-size:11px">Clienta desde ${primeraCompra}</div>
-          </div>
-          <button onclick="generarReporteClientaPDF()"
-            style="background:white;color:var(--accent);border:none;border-radius:8px;padding:10px 18px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap">
-            📄 Generar Reporte
-          </button>
+      <div style="background:var(--accent-light);border:1px solid var(--accent);border-radius:8px;padding:12px 16px">
+        <div style="font-weight:700;color:var(--accent);margin-bottom:8px;font-size:13px">
+          📊 Resumen — ${clientes.join(', ')}
         </div>
-        <!-- Estadísticas -->
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;text-align:center;padding:14px 0">
-          <div style="border-right:1px solid rgba(29,78,216,0.2)">
-            <div style="font-size:22px;font-weight:900;color:var(--accent)">${filtered.length}</div>
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">Compras totales</div>
-          </div>
-          <div style="border-right:1px solid rgba(29,78,216,0.2)">
-            <div style="font-size:22px;font-weight:900;color:var(--orange)">${fmt(totalCliente)}</div>
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">Total gastado</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--accent)">${filtered.length}</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Compras</div>
           </div>
           <div>
-            <div style="font-size:22px;font-weight:900;color:var(--green)">${fmt(gananciaCliente)}</div>
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">Tu ganancia</div>
+            <div style="font-size:20px;font-weight:800;color:var(--orange)">${fmt(totalCliente)}</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Total gastado</div>
+          </div>
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--green)">${fmt(gananciaCliente)}</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Tu ganancia</div>
           </div>
         </div>
       </div>`;
@@ -1419,6 +1521,7 @@ function renderHistory() {
       </div>
     </div>`).join('');
 
+  // Generar QRs después de que el DOM esté listo
   setTimeout(renderQRCodes, 50);
 }
 
@@ -1724,31 +1827,51 @@ function deleteProduct(id) {
 
 // ─── SETTINGS ─────────────────────────────────────────────────────────────────
 function loadSettings() {
-  document.getElementById('cfgBizName').value        = cfg.bizName || '';
-  document.getElementById('cfgPhone').value          = cfg.phone   || '';
-  document.getElementById('cfgAddress').value        = cfg.address || '';
-  document.getElementById('cfgMsg').value            = cfg.msg     || '';
-  document.getElementById('cfgLogo').value           = cfg.logo    || '';
-  document.getElementById('cfgPrinterTicket').value  = cfg.printerTicket || '';
-  document.getElementById('cfgPrinterLabel').value   = cfg.printerLabel  || '';
+  document.getElementById('cfgBizName').value        = cfg.bizName  || '';
+  document.getElementById('cfgPhone').value          = cfg.phone    || '';
+  document.getElementById('cfgAddress').value        = cfg.address  || '';
+  document.getElementById('cfgRfc').value            = cfg.rfc      || '';
+  document.getElementById('cfgMsg').value            = cfg.msg      || '';
+  document.getElementById('cfgPrinterTicket').value  = cfg.printerTicket  || '';
+  document.getElementById('cfgPrinterLabel').value   = cfg.printerLabel   || '';
   document.getElementById('cfgLabelNameSize').value  = cfg.labelNameSize  || 10;
   document.getElementById('cfgLabelPriceSize').value = cfg.labelPriceSize || 16;
+  // Header config
+  document.getElementById('cfgHeaderNameSize').value = cfg.headerNameSize || 22;
+  document.getElementById('cfgHeaderDataSize').value = cfg.headerDataSize || 10;
+  document.getElementById('cfgNameBold').checked    = cfg.headerNameBold !== false;
+  document.getElementById('cfgNameItalic').checked  = cfg.headerNameItalic === true;
+  // Logo
+  if (cfg.headerLogo) {
+    document.getElementById('logoPreviewImg').src = cfg.headerLogo;
+    document.getElementById('logoPreviewImg').style.display = '';
+    document.getElementById('logoPreviewEmpty').style.display = 'none';
+    document.getElementById('btnQuitarLogo').style.display = '';
+  }
+  setAlign(cfg.headerAlign || 'center', false);
   updateLabelPreview();
+  previewHeader();
 }
 
 function saveSettings() {
-  cfg.bizName       = document.getElementById('cfgBizName').value.trim()       || 'MI NEGOCIO';
+  cfg.bizName       = document.getElementById('cfgBizName').value.trim()  || 'MI NEGOCIO';
   cfg.phone         = document.getElementById('cfgPhone').value.trim();
   cfg.address       = document.getElementById('cfgAddress').value.trim();
-  cfg.msg           = document.getElementById('cfgMsg').value.trim()           || '¡Gracias por su compra!';
-  cfg.logo          = document.getElementById('cfgLogo').value.trim()          || '🏪';
+  cfg.rfc           = document.getElementById('cfgRfc').value.trim();
+  cfg.msg           = document.getElementById('cfgMsg').value.trim()      || '¡Gracias por su compra!';
   cfg.printerTicket = document.getElementById('cfgPrinterTicket').value.trim();
   cfg.printerLabel  = document.getElementById('cfgPrinterLabel').value.trim();
   cfg.labelNameSize  = parseInt(document.getElementById('cfgLabelNameSize').value)  || 10;
   cfg.labelPriceSize = parseInt(document.getElementById('cfgLabelPriceSize').value) || 16;
+  // Header config
+  cfg.headerNameSize   = parseInt(document.getElementById('cfgHeaderNameSize').value) || 22;
+  cfg.headerDataSize   = parseInt(document.getElementById('cfgHeaderDataSize').value) || 10;
+  cfg.headerNameBold   = document.getElementById('cfgNameBold').checked;
+  cfg.headerNameItalic = document.getElementById('cfgNameItalic').checked;
+  // Logo se guarda en handleLogoUpload directamente
   saveAll();
   updateHeader();
-  toast('¡Configuración guardada! ✅');
+  toast('¡Configuración guardada!');
 }
 
 function resetAll() {
@@ -1761,6 +1884,82 @@ function resetAll() {
   }).finally(() => location.reload());
 }
 
+// ─── CONFIGURACIÓN DEL ENCABEZADO ─────────────────────────────────────────────
+function handleLogoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 500000) { toast('La imagen es muy grande. Usa una menor a 500KB', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    cfg.headerLogo = e.target.result;
+    document.getElementById('logoPreviewImg').src = e.target.result;
+    document.getElementById('logoPreviewImg').style.display = '';
+    document.getElementById('logoPreviewEmpty').style.display = 'none';
+    document.getElementById('btnQuitarLogo').style.display = '';
+    previewHeader();
+    saveAll();
+    toast('Logo cargado correctamente');
+  };
+  reader.readAsDataURL(file);
+}
+
+function quitarLogo() {
+  cfg.headerLogo = '';
+  document.getElementById('logoPreviewImg').style.display = 'none';
+  document.getElementById('logoPreviewEmpty').style.display = '';
+  document.getElementById('btnQuitarLogo').style.display = 'none';
+  document.getElementById('cfgLogoFile').value = '';
+  previewHeader();
+  saveAll();
+  toast('Logo eliminado');
+}
+
+function setAlign(align, save = true) {
+  cfg.headerAlign = align;
+  ['left','center','right'].forEach(a => {
+    const btn = document.getElementById('align' + a.charAt(0).toUpperCase() + a.slice(1));
+    if (!btn) return;
+    if (a === align) {
+      btn.style.border = '1.5px solid var(--accent)';
+      btn.style.background = 'var(--accent-light)';
+    } else {
+      btn.style.border = '1.5px solid var(--border)';
+      btn.style.background = 'var(--surface2)';
+    }
+  });
+  previewHeader();
+}
+
+function previewHeader() {
+  const box = document.getElementById('headerPreview');
+  if (!box) return;
+  const nameSize  = document.getElementById('cfgHeaderNameSize')?.value || 22;
+  const dataSize  = document.getElementById('cfgHeaderDataSize')?.value || 10;
+  const bold      = document.getElementById('cfgNameBold')?.checked !== false;
+  const italic    = document.getElementById('cfgNameItalic')?.checked === true;
+  const align     = cfg.headerAlign || 'center';
+  const bizName   = document.getElementById('cfgBizName')?.value || cfg.bizName || 'MI NEGOCIO';
+  const phone     = document.getElementById('cfgPhone')?.value   || cfg.phone   || '';
+  const address   = document.getElementById('cfgAddress')?.value || cfg.address || '';
+  const rfc       = document.getElementById('cfgRfc')?.value     || cfg.rfc     || '';
+  const logo      = cfg.headerLogo || '';
+
+  document.getElementById('valNameSize').textContent = nameSize + 'pt';
+  document.getElementById('valDataSize').textContent = dataSize + 'pt';
+
+  const textAlign = align;
+  let html = `<div style="text-align:${textAlign};font-family:Arial,sans-serif">`;
+  if (logo) {
+    html += `<img src="${logo}" style="height:60px;object-fit:contain;display:block;margin:${align==='center'?'0 auto':'0'} 0 8px ${align==='right'?'auto':'0'}">`;
+  }
+  html += `<div style="font-size:${nameSize}px;font-weight:${bold?'bold':'normal'};font-style:${italic?'italic':'normal'};line-height:1.2">${bizName}</div>`;
+  if (address) html += `<div style="font-size:${dataSize}px;color:#555;margin-top:4px">${address}</div>`;
+  if (phone)   html += `<div style="font-size:${dataSize}px;color:#555">Tel: ${phone}</div>`;
+  if (rfc)     html += `<div style="font-size:${dataSize}px;color:#555">RFC: ${rfc}</div>`;
+  html += `</div>`;
+  box.innerHTML = html;
+}
+
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 function fmt(n)   { return '$' + (parseFloat(n)||0).toFixed(2); }
 function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -1768,182 +1967,6 @@ function escJs(s)  { return String(s).replace(/'/g,"\\'"); }
 function safe(s)   { return String(s).replace(/[^a-zA-Z0-9_\-]/g,'_'); }
 
 // ─── ALERTA DE STOCK BAJO ─────────────────────────────────────────────────────
-// ─── AUTOCOMPLETADO Y REPORTE DE CLIENTAS ─────────────────────────────────────
-function getClientasList() {
-  const fromSales = sales.map(s => s.customer).filter(Boolean);
-  const fromCfg   = cfg.customers || [];
-  return [...new Set([...fromCfg, ...fromSales])].sort();
-}
-
-function histAutocomplete(val) {
-  const box = document.getElementById('histSuggestions');
-  if (!box) return;
-  if (!val || val.length < 2) { box.style.display = 'none'; return; }
-  const q = val.toLowerCase();
-  const matches = getClientasList().filter(c => c.toLowerCase().includes(q));
-  if (!matches.length) { box.style.display = 'none'; return; }
-  box.innerHTML = matches.map(c => `
-    <div onclick="selectHistCustomer('${escJs(c)}')"
-      style="padding:10px 16px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"
-      onmouseover="this.style.background='var(--accent-light)'"
-      onmouseout="this.style.background=''">
-      <span style="font-size:16px">👤</span>
-      <div>
-        <div style="font-weight:700">${c}</div>
-        <div style="font-size:11px;color:var(--muted)">${sales.filter(s=>s.customer===c).length} compras registradas</div>
-      </div>
-    </div>`).join('');
-  box.style.display = 'block';
-}
-
-function selectHistCustomer(name) {
-  document.getElementById('histSearch').value = name;
-  const box = document.getElementById('histSuggestions');
-  if (box) box.style.display = 'none';
-  renderHistory();
-}
-
-function histKeydown(e) {
-  if (e.key === 'Escape') {
-    const box = document.getElementById('histSuggestions');
-    if (box) box.style.display = 'none';
-  }
-}
-
-// Cerrar sugerencias al hacer clic fuera
-document.addEventListener('click', e => {
-  if (!e.target.closest('#histSearch') && !e.target.closest('#histSuggestions')) {
-    const box = document.getElementById('histSuggestions');
-    if (box) box.style.display = 'none';
-  }
-});
-
-// ─── REPORTE PDF POR CLIENTA ──────────────────────────────────────────────────
-function generarReporteClientaPDF() {
-  const nombre = (document.getElementById('histSearch')?.value || '').trim();
-  if (!nombre) { toast('Busca primero a la clienta usando el campo de arriba', 'error'); return; }
-
-  const ventasCliente = sales.filter(s =>
-    s.customer.toLowerCase().includes(nombre.toLowerCase())
-  ).sort((a,b) => new Date(a.date) - new Date(b.date));
-
-  if (!ventasCliente.length) {
-    toast('Sin ventas para "' + nombre + '"', 'error');
-    return;
-  }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'mm', format:'letter', orientation:'portrait' });
-  const W = 216, PL = 20, PR = 20;
-  let y = 20;
-  const ln = (h=5) => { y += h; };
-
-  // ── Encabezado empresa ──
-  doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
-  doc.text(cfg.bizName || 'MI NEGOCIO', W/2, y, {align:'center'}); ln(8);
-  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
-  if (cfg.address) { doc.text(cfg.address, W/2, y, {align:'center'}); ln(5); }
-  if (cfg.phone)   { doc.text('Tel: ' + cfg.phone, W/2, y, {align:'center'}); ln(5); }
-  doc.setFontSize(9); doc.setTextColor(120,120,120);
-  const ahora = new Date();
-  doc.text(
-    'Reporte generado el ' +
-    ahora.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) +
-    ' a las ' + ahora.toLocaleTimeString('es-MX'),
-    W/2, y, {align:'center'}
-  );
-  doc.setTextColor(0,0,0); ln(8);
-  doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(6);
-
-  // ── Datos de la clienta ──
-  const nombreReal = ventasCliente[0].customer;
-  const primeraCompra = new Date(ventasCliente[0].date).toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'});
-  const ultimaCompra  = new Date(ventasCliente[ventasCliente.length-1].date).toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'});
-
-  doc.setFillColor(235,242,255);
-  doc.setDrawColor(29,78,216); doc.setLineWidth(0.3);
-  doc.roundedRect(PL, y, W-PL-PR, 26, 3, 3, 'FD'); doc.setDrawColor(0);
-  y += 6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(29,78,216);
-  doc.text('HISTORIAL DE CLIENTA', PL+6, y); ln(7);
-  doc.setFontSize(11); doc.setTextColor(0,0,0);
-  doc.text('Nombre: ' + nombreReal, PL+6, y);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(80,80,80);
-  doc.text('Primera compra: ' + primeraCompra + '   |   Ultima compra: ' + ultimaCompra, W-PR, y, {align:'right'});
-  y += 12;
-  doc.setLineWidth(0.4); doc.line(PL, y, W-PR, y); ln(7);
-
-  // ── Encabezado tabla ──
-  doc.setFillColor(25,55,170);
-  doc.rect(PL, y-4, W-PL-PR, 11, 'F');
-  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
-  doc.text('FECHA',      PL+4,   y+3);
-  doc.text('FOLIO',      PL+46,  y+3);
-  doc.text('PRODUCTOS',  PL+78,  y+3);
-  doc.text('TOTAL',      W-PR,   y+3, {align:'right'});
-  ln(10); doc.setTextColor(0,0,0);
-
-  let totalAcumulado = 0;
-  let fila = 0;
-
-  ventasCliente.forEach(s => {
-    if (y > 245) {
-      doc.addPage(); y = 20;
-      doc.setFillColor(25,55,170);
-      doc.rect(PL, y-4, W-PL-PR, 11, 'F');
-      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
-      doc.text('FECHA', PL+4, y+3); doc.text('FOLIO', PL+46, y+3);
-      doc.text('PRODUCTOS', PL+78, y+3); doc.text('TOTAL', W-PR, y+3, {align:'right'});
-      ln(10); doc.setTextColor(0,0,0);
-    }
-
-    if (fila % 2 === 0) {
-      doc.setFillColor(248,250,255);
-      doc.rect(PL, y-3, W-PL-PR, 10, 'F');
-    }
-    fila++;
-
-    const fecha    = new Date(s.date).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
-    const folio    = '#' + s.id.slice(-6).toUpperCase();
-    const prods    = s.items.map(i => i.name + ' x' + i.qty).join(', ');
-    const prodsTxt = prods.length > 52 ? prods.slice(0,52)+'...' : prods;
-
-    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
-    doc.text(fecha,    PL+4,  y+1);
-    doc.setTextColor(100,100,100);
-    doc.text(folio,    PL+46, y+1);
-    doc.text(prodsTxt, PL+78, y+1);
-    doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
-    doc.text(fmt(s.total), W-PR, y+1, {align:'right'});
-
-    doc.setDrawColor(210,215,230); doc.setLineWidth(0.1);
-    doc.line(PL, y+5, W-PR, y+5); doc.setDrawColor(0);
-
-    totalAcumulado += s.total;
-    ln(9);
-  });
-
-  // ── Total acumulado ──
-  ln(4);
-  doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(5);
-
-  doc.setFillColor(235,255,240); doc.setDrawColor(22,163,74); doc.setLineWidth(0.3);
-  doc.roundedRect(PL, y, W-PL-PR, 18, 3, 3, 'FD'); doc.setDrawColor(0);
-  y += 5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(22,163,74);
-  doc.text('Total acumulado de ' + ventasCliente.length + ' compras realizadas:', PL+6, y+3);
-  doc.setFontSize(15); doc.setFont('helvetica','bold');
-  doc.text(fmt(totalAcumulado), W-PR-4, y+4, {align:'right'});
-  doc.setTextColor(0,0,0); ln(22);
-
-  // ── Pie ──
-  doc.setTextColor(160,160,160); doc.setFont('helvetica','italic'); doc.setFontSize(8);
-  doc.text((cfg.bizName||'MI NEGOCIO') + ' — Reporte de clienta generado automaticamente', W/2, 272, {align:'center'});
-
-  doc.save('reporte_' + safe(nombreReal) + '_' + ahora.toLocaleDateString('es-MX').replace(/\//g,'-') + '.pdf');
-  toast('Reporte de ' + nombreReal + ' descargado');
-}
-
 function checkStockAlerts(updatedProducts) {
   const lowItems = updatedProducts.filter(p => p.stock > 0 && p.stock <= 10);
   if (!lowItems.length) return;
