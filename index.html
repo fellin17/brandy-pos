@@ -561,23 +561,45 @@ return QRCode;
           </div>
         </div>
 
+        <!-- Margen vertical (centrado) -->
+        <div class="input-group">
+          <label>
+            Posición vertical del contenido
+            <span id="lblMarginVal" style="color:var(--accent);font-weight:800;margin-left:6px">Centro</span>
+          </label>
+          <input type="range" id="cfgLabelMargin" min="0" max="8" step="0.5" value="2"
+            oninput="updateLabelPreview()"
+            style="width:100%;accent-color:var(--accent);margin-top:4px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">
+            <span>⬆ Más arriba</span><span>⬇ Más abajo</span>
+          </div>
+        </div>
+
+        <!-- Mostrar fecha -->
+        <div class="input-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="cfgLabelShowDate" onchange="updateLabelPreview()" checked>
+            Mostrar fecha en la etiqueta (ej: 29/03/2026)
+          </label>
+        </div>
+
         <!-- Preview de etiqueta -->
         <div style="margin-bottom:14px">
           <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">
             Vista previa (tamaño real 41×25mm)
           </div>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-            <!-- Preview a escala real -->
             <div id="labelPreview" style="
               width:154.9px; height:94.5px;
               border:2px dashed var(--border); border-radius:4px;
               background:white; display:flex; flex-direction:column;
               align-items:center; justify-content:center;
-              padding:4px; overflow:hidden; flex-shrink:0;
+              overflow:hidden; flex-shrink:0;
               box-shadow:var(--shadow);
             ">
-              <div id="prevName" style="font-family:Arial,sans-serif;font-weight:bold;text-align:center;word-break:break-word;line-height:1.2;font-size:10pt;">NOMBRE CLIENTA</div>
-              <div id="prevPrice" style="font-family:Arial,sans-serif;font-weight:bold;margin-top:4px;font-size:16pt;">$199.99</div>
+              <div id="prevName"  style="font-family:Arial,sans-serif;font-weight:bold;text-align:center;word-break:break-word;line-height:1.2;font-size:10pt;">NOMBRE CLIENTA</div>
+              <div id="prevPrice" style="font-family:Arial,sans-serif;font-weight:bold;margin-top:2px;font-size:16pt;">$199.99</div>
+              <div id="prevDate"  style="font-family:Arial,sans-serif;font-size:7pt;color:#555;margin-top:2px;">29/03/2026</div>
             </div>
             <div style="font-size:11px;color:var(--muted);line-height:1.6">
               📐 Escala real 41×25mm<br>
@@ -727,7 +749,7 @@ let cfg = {
   bizName:'MI NEGOCIO', phone:'', address:'', rfc:'',
   msg:'¡Gracias por su compra! Vuelva pronto 😊',
   logo:'🏪', printerTicket:'', printerLabel:'',
-  labelNameSize:10, labelPriceSize:16,
+  labelNameSize:10, labelPriceSize:16, labelMargin:2, labelShowDate:true,
   customers:[],
   headerLogo:'',         // base64 de imagen de logo
   headerNameSize:22,     // tamaño fuente nombre empresa
@@ -1026,25 +1048,48 @@ function printLabelFromCart() {
   if (!customer) { toast('Escribe el nombre de la clienta primero', 'error'); return; }
   if (!cart.length) { toast('El carrito está vacío', 'error'); return; }
 
-  saveSaleFromCart(); // Guarda en historial si no se había guardado
-  toast('✅ Nota guardada en historial');
-  printLabel(customer, total);
+  saveSaleFromCart();
+  toast('Nota guardada en historial');
+  printLabel(customer, total, new Date().toISOString());
 }
 
 function updateLabelPreview() {
   const nameSize  = document.getElementById('cfgLabelNameSize')?.value  || 10;
   const priceSize = document.getElementById('cfgLabelPriceSize')?.value || 16;
+  const margin    = document.getElementById('cfgLabelMargin')?.value    || 2;
+  const showDate  = document.getElementById('cfgLabelShowDate')?.checked !== false;
+
   document.getElementById('lblNameSizeVal').textContent  = nameSize  + 'pt';
   document.getElementById('lblPriceSizeVal').textContent = priceSize + 'pt';
+
+  // Texto del margen
+  const marginVal = parseFloat(margin);
+  const marginTxt = marginVal <= 1 ? 'Muy arriba' : marginVal <= 3 ? 'Arriba' : marginVal <= 5 ? 'Centro' : marginVal <= 7 ? 'Abajo' : 'Muy abajo';
+  const lblMargin = document.getElementById('lblMarginVal');
+  if (lblMargin) lblMargin.textContent = marginTxt;
+
+  // Actualizar preview
+  const prev = document.getElementById('labelPreview');
+  if (prev) prev.style.paddingTop = (marginVal * 3) + 'px';
+
   if (document.getElementById('prevName')) {
     document.getElementById('prevName').style.fontSize  = nameSize  + 'pt';
     document.getElementById('prevPrice').style.fontSize = priceSize + 'pt';
   }
+  const prevDate = document.getElementById('prevDate');
+  if (prevDate) prevDate.style.display = showDate ? '' : 'none';
 }
 
-function printLabel(customer, total) {
-  const nameSize  = cfg.labelNameSize  || 10;
-  const priceSize = cfg.labelPriceSize || 16;
+function printLabel(customer, total, saleDate) {
+  const nameSize  = cfg.labelNameSize   || 10;
+  const priceSize = cfg.labelPriceSize  || 16;
+  const margin    = cfg.labelMargin     !== undefined ? cfg.labelMargin : 2;
+  const showDate  = cfg.labelShowDate   !== false;
+
+  // Fecha: usa la de la venta si existe, si no usa hoy
+  const dateObj = saleDate ? new Date(saleDate) : new Date();
+  const fecha   = dateObj.toLocaleDateString('es-MX', { day:'2-digit', month:'2-digit', year:'numeric' });
+
   const win = window.open('', '_blank', 'width=200,height=150');
   if (!win) { toast('Permite ventanas emergentes para imprimir etiquetas', 'error'); return; }
   win.document.write(`<!DOCTYPE html><html><head>
@@ -1055,15 +1100,18 @@ function printLabel(customer, total) {
       body {
         display:flex; flex-direction:column;
         justify-content:center; align-items:center;
-        font-family:Arial,sans-serif; padding:2mm;
+        font-family:Arial,sans-serif;
+        padding-top:${margin}mm; padding-left:2mm; padding-right:2mm; padding-bottom:1mm;
         background:white;
       }
       .name  { font-size:${nameSize}pt;  font-weight:bold; text-align:center; word-break:break-word; line-height:1.2; }
-      .total { font-size:${priceSize}pt; font-weight:bold; margin-top:1.5mm; letter-spacing:-0.5px; }
+      .total { font-size:${priceSize}pt; font-weight:bold; margin-top:1mm; letter-spacing:-0.5px; }
+      .fecha { font-size:6.5pt; color:#444; margin-top:1mm; }
     </style>
   </head><body onload="setTimeout(()=>{window.print();},200)">
     <div class="name">${escHtml(customer)}</div>
     <div class="total">$${parseFloat(total).toFixed(2)}</div>
+    ${showDate ? `<div class="fecha">${fecha}</div>` : ''}
   </body></html>`);
   win.document.close();
 }
@@ -1517,7 +1565,7 @@ function renderHistory() {
         <div style="display:flex;gap:12px;align-items:flex-start;margin-top:10px">
           <div style="flex:1;display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" onclick='generateTicketPDF(${JSON.stringify(s)})'>📄 PDF</button>
-            <button class="btn btn-ghost btn-sm" onclick="printLabel('${escJs(s.customer)}',${s.total})">🏷️ Etiqueta</button>
+            <button class="btn btn-ghost btn-sm" onclick="printLabel('${escJs(s.customer)}',${s.total},'${s.date}')">🏷️ Etiqueta</button>
             <button class="btn btn-sm" style="background:#25D366;color:white;border:none;border-radius:6px;font-weight:700;cursor:pointer;padding:5px 10px;font-size:12px" onclick='shareWhatsApp(${JSON.stringify(s)})'>📲 WhatsApp</button>
           </div>
           <div style="text-align:center;flex-shrink:0">
@@ -1845,6 +1893,10 @@ function loadSettings() {
   document.getElementById('cfgPrinterLabel').value   = cfg.printerLabel   || '';
   document.getElementById('cfgLabelNameSize').value  = cfg.labelNameSize  || 10;
   document.getElementById('cfgLabelPriceSize').value = cfg.labelPriceSize || 16;
+  const marginEl = document.getElementById('cfgLabelMargin');
+  if (marginEl) marginEl.value = cfg.labelMargin !== undefined ? cfg.labelMargin : 2;
+  const dateEl = document.getElementById('cfgLabelShowDate');
+  if (dateEl) dateEl.checked = cfg.labelShowDate !== false;
   // Header config
   document.getElementById('cfgHeaderNameSize').value = cfg.headerNameSize || 22;
   document.getElementById('cfgHeaderDataSize').value = cfg.headerDataSize || 10;
@@ -1872,6 +1924,8 @@ function saveSettings() {
   cfg.printerLabel  = document.getElementById('cfgPrinterLabel').value.trim();
   cfg.labelNameSize  = parseInt(document.getElementById('cfgLabelNameSize').value)  || 10;
   cfg.labelPriceSize = parseInt(document.getElementById('cfgLabelPriceSize').value) || 16;
+  cfg.labelMargin    = parseFloat(document.getElementById('cfgLabelMargin')?.value)    ?? 2;
+  cfg.labelShowDate  = document.getElementById('cfgLabelShowDate')?.checked !== false;
   // Header config
   cfg.headerNameSize   = parseInt(document.getElementById('cfgHeaderNameSize').value) || 22;
   cfg.headerDataSize   = parseInt(document.getElementById('cfgHeaderDataSize').value) || 10;
