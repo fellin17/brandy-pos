@@ -11,6 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -207,10 +208,72 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 
 <!-- ═══ TAB: NOTAS ═══ -->
 <div id="tab-notas" class="content" style="display:none">
-  <div style="display:flex;gap:8px;margin-bottom:12px">
-    <input class="input" id="notaSearch" placeholder="Buscar por nombre de clienta..." oninput="renderNotas()" style="flex:1">
+
+  <!-- Botón principal de Reportes -->
+  <button onclick="toggleReporteMenu()"
+    style="width:100%;margin-bottom:12px;padding:14px;background:linear-gradient(135deg,#1d4ed8,#7c3aed);color:white;border:none;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:8px">
+    📊 Reportes de Ventas
+  </button>
+
+  <!-- Submenú de tipo de reporte -->
+  <div id="reporteMenu" style="display:none;margin-bottom:14px">
+    <div class="card">
+      <div class="card-title">📅 Selecciona el período</div>
+      <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+        <button onclick="generarReporteMob('semanal')"
+          style="padding:13px;background:#eff6ff;border:1.5px solid #1d4ed8;border-radius:10px;color:#1d4ed8;font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation;text-align:left">
+          📅 Reporte Semanal<br><span style="font-size:11px;font-weight:400;opacity:.8">Ventas de los últimos 7 días con comparativa</span>
+        </button>
+        <button onclick="generarReporteMob('mensual')"
+          style="padding:13px;background:#f0fdf4;border:1.5px solid #16a34a;border-radius:10px;color:#16a34a;font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation;text-align:left">
+          📆 Reporte Mensual<br><span style="font-size:11px;font-weight:400;opacity:.8">Comparativa de meses con top 10 productos</span>
+        </button>
+        <button onclick="generarReporteMob('anual')"
+          style="padding:13px;background:#fdf4ff;border:1.5px solid #7c3aed;border-radius:10px;color:#7c3aed;font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation;text-align:left">
+          📈 Reporte Anual<br><span style="font-size:11px;font-weight:400;opacity:.8">Comparativa anual y top 10 más vendidos</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenedor del reporte generado -->
+  <div id="reporteContainer" style="display:none;margin-bottom:14px">
+    <div class="card">
+      <div style="padding:12px;display:flex;justify-content:space-between;align-items:center">
+        <div id="reporteTitulo" style="font-weight:800;font-size:14px;color:var(--blue)"></div>
+        <div style="display:flex;gap:6px">
+          <button onclick="reportePDFMob()" class="btn-sm btn" style="background:var(--blue);color:white;border:none;width:auto;margin:0;padding:8px 12px;font-size:12px">📄 PDF</button>
+          <button onclick="cerrarReporte()" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700">✕</button>
+        </div>
+      </div>
+
+      <!-- Resumen estadístico -->
+      <div id="reporteStats" style="display:grid;grid-template-columns:repeat(3,1fr);text-align:center;padding:0 12px 12px;gap:8px"></div>
+
+      <!-- Gráfica -->
+      <div style="padding:0 12px 12px">
+        <canvas id="chartMob" height="200"></canvas>
+      </div>
+
+      <!-- Top 10 productos -->
+      <div id="reporteTop10" style="display:none">
+        <div style="padding:8px 14px;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;border-top:1px solid var(--border)">
+          🏆 Top 10 productos más vendidos
+        </div>
+        <div id="top10List"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Buscador de notas -->
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <div style="flex:1;position:relative">
+      <input class="input" id="notaSearch" placeholder="Buscar por nombre de clienta..."
+        oninput="renderNotas()" autocomplete="off" style="flex:1">
+    </div>
     <button onclick="startScan('nota')" style="background:var(--blue);color:white;border:none;border-radius:8px;padding:0 14px;font-size:20px;cursor:pointer;touch-action:manipulation;flex-shrink:0">📷</button>
   </div>
+  <button class="btn btn-blue" style="margin-bottom:12px" onclick="mobReporteClientaPDF()">📄 Reporte de esta clienta</button>
   <div id="notasList"></div>
 </div>
 
@@ -899,6 +962,278 @@ function generarPDFNota(saleId) {
 
   doc.save(`ticket_${sale.customer.replace(/\s+/g,'_')}_${sale.id.slice(-6)}.pdf`);
   toast('📄 PDF descargado');
+}
+
+// ─── REPORTES DE VENTAS (MÓVIL) ───────────────────────────────────────────────
+let _chartMob = null;
+let _reportePeriodo = '';
+let _reporteData = {};
+
+function toggleReporteMenu() {
+  const m = document.getElementById('reporteMenu');
+  m.style.display = m.style.display === 'none' ? '' : 'none';
+}
+
+function cerrarReporte() {
+  document.getElementById('reporteContainer').style.display = 'none';
+  if (_chartMob) { _chartMob.destroy(); _chartMob = null; }
+}
+
+function generarReporteMob(periodo) {
+  _reportePeriodo = periodo;
+  document.getElementById('reporteMenu').style.display = 'none';
+  document.getElementById('reporteContainer').style.display = '';
+  if (_chartMob) { _chartMob.destroy(); _chartMob = null; }
+
+  const ahora = new Date();
+
+  if (periodo === 'semanal') {
+    // Últimas 4 semanas
+    const semanas = [];
+    for (let i = 3; i >= 0; i--) {
+      const ini = new Date(ahora); ini.setDate(ahora.getDate() - (i+1)*7);
+      const fin = new Date(ahora); fin.setDate(ahora.getDate() - i*7);
+      const ventasSem = sales.filter(s => {
+        const d = new Date(s.date); return d >= ini && d < fin;
+      });
+      semanas.push({
+        label: i === 0 ? 'Esta semana' : `Hace ${i} sem`,
+        total: ventasSem.reduce((a,s) => a+s.total, 0),
+        ventas: ventasSem.length
+      });
+    }
+    _reporteData = { semanas };
+    document.getElementById('reporteTitulo').textContent = '📅 Reporte Semanal';
+    mostrarEstadsMob(semanas);
+    mostrarGraficaMob(
+      semanas.map(s => s.label),
+      semanas.map(s => s.total),
+      'Ventas por semana', '#1d4ed8'
+    );
+    document.getElementById('reporteTop10').style.display = 'none';
+
+  } else if (periodo === 'mensual') {
+    // Últimos 6 meses
+    const meses = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
+      const fin = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+      const ventasMes = sales.filter(s => {
+        const sd = new Date(s.date); return sd >= d && sd < fin;
+      });
+      meses.push({
+        label: d.toLocaleDateString('es-MX', {month:'short', year:'2-digit'}),
+        total: ventasMes.reduce((a,s) => a+s.total, 0),
+        ventas: ventasMes.length
+      });
+    }
+    _reporteData = { meses };
+    document.getElementById('reporteTitulo').textContent = '📆 Reporte Mensual';
+    mostrarEstadsMob(meses);
+    mostrarGraficaMob(
+      meses.map(m => m.label),
+      meses.map(m => m.total),
+      'Ventas por mes', '#16a34a'
+    );
+    mostrarTop10Mob();
+
+  } else if (periodo === 'anual') {
+    // Por año
+    const porAnio = {};
+    sales.forEach(s => {
+      const anio = new Date(s.date).getFullYear();
+      if (!porAnio[anio]) porAnio[anio] = { total:0, ventas:0 };
+      porAnio[anio].total  += s.total;
+      porAnio[anio].ventas += 1;
+    });
+    const anios = Object.keys(porAnio).sort().map(a => ({
+      label: a,
+      total: porAnio[a].total,
+      ventas: porAnio[a].ventas
+    }));
+    _reporteData = { anios };
+    document.getElementById('reporteTitulo').textContent = '📈 Reporte Anual';
+    mostrarEstadsMob(anios);
+    mostrarGraficaMob(
+      anios.map(a => a.label),
+      anios.map(a => a.total),
+      'Ventas por año', '#7c3aed'
+    );
+    mostrarTop10Mob();
+  }
+}
+
+function mostrarEstadsMob(datos) {
+  const totalVentas  = datos.reduce((a,d) => a+d.ventas, 0);
+  const totalDinero  = datos.reduce((a,d) => a+d.total,  0);
+  const mejorPeriodo = datos.reduce((a,b) => a.total > b.total ? a : b, datos[0] || {label:'-',total:0});
+  document.getElementById('reporteStats').innerHTML = `
+    <div style="background:#eff6ff;border-radius:8px;padding:10px 6px">
+      <div style="font-size:18px;font-weight:900;color:#1d4ed8">${totalVentas}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Ventas</div>
+    </div>
+    <div style="background:#f0fdf4;border-radius:8px;padding:10px 6px">
+      <div style="font-size:14px;font-weight:900;color:#16a34a">$${totalDinero.toFixed(0)}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Total</div>
+    </div>
+    <div style="background:#fdf4ff;border-radius:8px;padding:10px 6px">
+      <div style="font-size:12px;font-weight:900;color:#7c3aed">${mejorPeriodo.label}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Mejor</div>
+    </div>`;
+}
+
+function mostrarGraficaMob(labels, datos, titulo, color) {
+  const ctx = document.getElementById('chartMob').getContext('2d');
+  _chartMob = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: titulo,
+        data: datos,
+        backgroundColor: color + 'cc',
+        borderColor: color,
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => '$' + ctx.parsed.y.toFixed(2) } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => '$' + v } }
+      }
+    }
+  });
+}
+
+function mostrarTop10Mob() {
+  // Contar piezas vendidas por producto
+  const conteo = {};
+  sales.forEach(s => {
+    s.items.forEach(i => {
+      if (!conteo[i.name]) conteo[i.name] = { qty: 0, total: 0 };
+      conteo[i.name].qty   += i.qty;
+      conteo[i.name].total += i.sellPrice * i.qty;
+    });
+  });
+
+  const top10 = Object.entries(conteo)
+    .sort((a,b) => b[1].qty - a[1].qty)
+    .slice(0, 10);
+
+  const maxQty = top10[0]?.[1].qty || 1;
+
+  document.getElementById('reporteTop10').style.display = '';
+  document.getElementById('top10List').innerHTML = top10.map(([name, data], i) => `
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-weight:700;font-size:13px;flex:1">
+          <span style="color:${i < 3 ? '#f59e0b' : 'var(--muted)'};margin-right:6px">${i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+          ${name}
+        </div>
+        <div style="font-weight:800;font-size:13px;color:var(--blue)">$${data.total.toFixed(2)}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;background:#e5e7eb;border-radius:99px;height:6px">
+          <div style="width:${Math.round(data.qty/maxQty*100)}%;background:var(--blue);height:6px;border-radius:99px"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap">${data.qty} pzs</div>
+      </div>
+    </div>`).join('');
+}
+
+function reportePDFMob() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'letter', orientation:'portrait' });
+  const W = 216, PL = 20, PR = 20;
+  let y = 20;
+  const ln = (h=5) => { y += h; };
+
+  // Encabezado
+  doc.setFontSize(20); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+  doc.text(cfg.bizName || 'MI NEGOCIO', W/2, y, {align:'center'}); ln(8);
+  doc.setFontSize(12); doc.setFont('helvetica','normal');
+  doc.text(document.getElementById('reporteTitulo').textContent, W/2, y, {align:'center'}); ln(6);
+  doc.setFontSize(9); doc.setTextColor(120,120,120);
+  doc.text('Generado: ' + new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}), W/2, y, {align:'center'});
+  doc.setTextColor(0,0,0); ln(8);
+  doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(6);
+
+  // Datos según período
+  let filas = [];
+  if (_reportePeriodo === 'semanal' && _reporteData.semanas) filas = _reporteData.semanas;
+  if (_reportePeriodo === 'mensual' && _reporteData.meses)   filas = _reporteData.meses;
+  if (_reportePeriodo === 'anual'   && _reporteData.anios)   filas = _reporteData.anios;
+
+  // Tabla resumen
+  doc.setFillColor(25,55,170); doc.rect(PL, y-4, W-PL-PR, 10, 'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('PERÍODO', PL+4, y+2);
+  doc.text('VENTAS', PL+90, y+2, {align:'center'});
+  doc.text('TOTAL', W-PR, y+2, {align:'right'});
+  ln(9); doc.setTextColor(0,0,0);
+
+  filas.forEach((f, i) => {
+    if (i%2===0) { doc.setFillColor(248,250,255); doc.rect(PL,y-3,W-PL-PR,9,'F'); }
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.text(f.label, PL+4, y);
+    doc.setTextColor(80,80,80);
+    doc.text(String(f.ventas), PL+90, y, {align:'center'});
+    doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text('$'+f.total.toFixed(2), W-PR, y, {align:'right'});
+    doc.setTextColor(0,0,0);
+    doc.setDrawColor(210,215,230); doc.setLineWidth(0.1);
+    doc.line(PL, y+4, W-PR, y+4); doc.setDrawColor(0);
+    ln(9);
+  });
+
+  // Top 10
+  const conteo = {};
+  sales.forEach(s => s.items.forEach(i => {
+    if (!conteo[i.name]) conteo[i.name] = { qty:0, total:0 };
+    conteo[i.name].qty   += i.qty;
+    conteo[i.name].total += i.sellPrice * i.qty;
+  }));
+  const top10 = Object.entries(conteo).sort((a,b) => b[1].qty-a[1].qty).slice(0,10);
+
+  if (top10.length && (_reportePeriodo === 'mensual' || _reportePeriodo === 'anual')) {
+    ln(4); doc.setLineWidth(0.4); doc.line(PL,y,W-PR,y); ln(6);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0,0,0);
+    doc.text('TOP 10 — PRODUCTOS MÁS VENDIDOS', PL, y); ln(7);
+    doc.setFillColor(25,55,170); doc.rect(PL, y-4, W-PL-PR, 10, 'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(9);
+    doc.text('#', PL+4, y+2);
+    doc.text('PRODUCTO', PL+14, y+2);
+    doc.text('PIEZAS', PL+120, y+2, {align:'center'});
+    doc.text('TOTAL', W-PR, y+2, {align:'right'});
+    ln(9); doc.setTextColor(0,0,0);
+    top10.forEach(([name, data], i) => {
+      if (y > 248) { doc.addPage(); y = 20; }
+      if (i%2===0) { doc.setFillColor(248,250,255); doc.rect(PL,y-3,W-PL-PR,9,'F'); }
+      doc.setFont('helvetica', i<3?'bold':'normal'); doc.setFontSize(9);
+      doc.setTextColor(i===0?180:i===1?100:i===2?150:80, i===0?120:i===1?100:i===2?100:80, 0);
+      doc.text(String(i+1), PL+4, y);
+      doc.setTextColor(30,30,30);
+      const n = name.length>38?name.slice(0,38)+'...':name;
+      doc.text(n, PL+14, y);
+      doc.setTextColor(80,80,80);
+      doc.text(String(data.qty)+' pzs', PL+120, y, {align:'center'});
+      doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+      doc.text('$'+data.total.toFixed(2), W-PR, y, {align:'right'});
+      doc.setTextColor(0,0,0);
+      doc.setDrawColor(210,215,230); doc.setLineWidth(0.1);
+      doc.line(PL,y+4,W-PR,y+4); doc.setDrawColor(0); ln(9);
+    });
+  }
+
+  doc.setTextColor(150,150,150); doc.setFont('helvetica','italic'); doc.setFontSize(8);
+  doc.text((cfg.bizName||'MI NEGOCIO')+' — Reporte generado automaticamente', W/2, 272, {align:'center'});
+  doc.save('reporte_ventas_'+_reportePeriodo+'_'+new Date().toLocaleDateString('es-MX').replace(/\//g,'-')+'.pdf');
+  toast('PDF descargado');
 }
 
 // ─── TOAST ────────────────────────────────────────────────────────────────────
