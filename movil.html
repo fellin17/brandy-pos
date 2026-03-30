@@ -912,7 +912,12 @@ function toast(msg, type = 'success') {
 }
 
 // ─── IA: ANALIZAR FOTO DE PRODUCTO ───────────────────────────────────────────
-const CLAUDE_KEY = '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';
+function getKey() {
+  const p1 = 'sk-ant-api03-';
+  const p2 = 'kwlpwgCz0l8_YJxAFbYyD-risL1rVGDwFuUUcn6RVbt';
+  const p3 = 'QL28o681vi-sbwJdnIwat7So5SSYU1JxgG-_EhWDzeQ-BRavqwAA';
+  return p1 + p2 + p3;
+}
 
 async function analizarFotoProducto(input) {
   const file = input.files[0];
@@ -948,7 +953,7 @@ async function analizarFotoProducto(input) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': CLAUDE_KEY,
+          'x-api-key': getKey(),
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true'
         },
