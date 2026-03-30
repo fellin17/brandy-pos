@@ -322,9 +322,21 @@ return QRCode;
           <div style="font-size:12px;color:var(--muted)" id="invCount"></div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="toggleTop10PC()" style="background:#fef3c7;color:#92400e;border:1px solid #f59e0b">🏆 Top 10 vendidos</button>
           <button class="btn btn-ghost btn-sm" onclick="reportePDF()">📄 Reporte PDF</button>
           <button class="btn btn-ghost btn-sm" style="background:#25D366;color:white;border:none" onclick="reporteWhatsApp()">📲 Reporte WA</button>
           <button class="btn btn-primary" onclick="openProductModal()">+ Agregar Producto</button>
+        </div>
+      </div>
+
+      <!-- Panel Top 10 -->
+      <div id="top10Panel" style="display:none;margin-bottom:14px">
+        <div class="card">
+          <div class="card-header" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:white">
+            🏆 Top 10 — Productos más vendidos
+            <button onclick="toggleTop10PC()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;float:right">✕ Cerrar</button>
+          </div>
+          <div id="top10PCList" style="padding:8px"></div>
         </div>
       </div>
 
@@ -1673,6 +1685,75 @@ function highlightInvRow(rows) {
     row.style.borderLeft  = i === _invIdx ? '3px solid var(--accent)' : '';
   });
   if (rows[_invIdx]) rows[_invIdx].scrollIntoView({ block: 'nearest' });
+}
+
+// ─── TOP 10 MÁS VENDIDOS ──────────────────────────────────────────────────────
+function toggleTop10PC() {
+  const panel = document.getElementById('top10Panel');
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+
+  // Calcular top 10
+  const conteo = {};
+  sales.forEach(s => s.items.forEach(i => {
+    if (!conteo[i.name]) conteo[i.name] = { qty:0, total:0, stock:0 };
+    conteo[i.name].qty   += i.qty;
+    conteo[i.name].total += i.sellPrice * i.qty;
+  }));
+
+  // Agregar stock actual
+  products.forEach(p => {
+    if (conteo[p.name]) conteo[p.name].stock = p.stock;
+  });
+
+  const top10 = Object.entries(conteo)
+    .sort((a,b) => b[1].qty - a[1].qty)
+    .slice(0, 10);
+
+  if (!top10.length) {
+    document.getElementById('top10PCList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Sin ventas registradas aún</div>';
+    panel.style.display = '';
+    return;
+  }
+
+  const maxQty = top10[0][1].qty;
+  const medallas = ['🥇','🥈','🥉'];
+
+  document.getElementById('top10PCList').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:var(--surface2)">
+          <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--muted)">#</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--muted)">PRODUCTO</th>
+          <th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--muted)">VENDIDAS</th>
+          <th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--muted)">STOCK</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted)">TOTAL</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${top10.map(([name, data], i) => {
+          const pct = Math.round(data.qty / maxQty * 100);
+          const stockColor = data.stock === 0 ? 'var(--red)' : data.stock <= 10 ? 'var(--orange)' : 'var(--green)';
+          const stockIcon  = data.stock === 0 ? '🔴' : data.stock <= 10 ? '⚠️' : '✅';
+          return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:10px 12px;font-size:16px">${medallas[i] || (i+1)+'.'}</td>
+            <td style="padding:10px 12px">
+              <div style="font-weight:700">${name}</div>
+              <div style="margin-top:4px;background:#e5e7eb;border-radius:99px;height:5px">
+                <div style="width:${pct}%;background:var(--accent);height:5px;border-radius:99px"></div>
+              </div>
+            </td>
+            <td style="padding:10px 12px;text-align:center;font-weight:800;color:var(--accent)">${data.qty} pzs</td>
+            <td style="padding:10px 12px;text-align:center;font-weight:700;color:${stockColor}">${stockIcon} ${data.stock}</td>
+            <td style="padding:10px 12px;text-align:right;font-weight:800;color:var(--green)">${fmt(data.total)}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="padding:10px 12px;font-size:11px;color:var(--muted);text-align:center">
+      ⚠️ Stock en rojo o naranja = necesita surtirse pronto
+    </div>`;
+
+  panel.style.display = '';
 }
 
 function renderInventory() {
