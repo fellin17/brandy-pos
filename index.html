@@ -1388,27 +1388,31 @@ function waNumeroNuevoEnviar() {
   const num = document.getElementById('waNumeroNuevo').value.trim().replace(/\D/g,'');
   if (num.length !== 10) { toast('Escribe los 10 dígitos del número', 'error'); return; }
 
-  const customer = document.getElementById('posCustomer').value.trim() || 'Clienta';
-  // Buscar la última nota de este carrito
-  const sale = window._currentSaleId ? sales.find(s => s.id === window._currentSaleId) : null;
+  const customer = document.getElementById('posCustomer').value.trim();
+  if (!customer) { toast('Escribe el nombre de la clienta primero', 'error'); return; }
+  if (!cart.length) { toast('Agrega productos al carrito primero', 'error'); return; }
 
-  let msg = '';
-  if (sale) {
-    const lineas = sale.items.map(i => `• ${i.name} x${i.qty} — $${(i.sellPrice*i.qty).toFixed(2)}`).join('\n');
-    msg = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date(sale.date).toLocaleDateString('es-MX')}\n👤 *${sale.customer}*\n\n${lineas}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${sale.total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
-  } else {
-    // Si no hay venta completada, enviar el carrito actual
-    if (!cart.length) { toast('Agrega productos primero', 'error'); return; }
-    const total  = cart.reduce((s,i) => s + i.sellPrice*i.qty, 0);
-    const lineas = cart.map(i => `• ${i.name} x${i.qty} — $${(i.sellPrice*i.qty).toFixed(2)}`).join('\n');
-    msg = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date().toLocaleDateString('es-MX')}\n👤 *${customer}*\n\n${lineas}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
+  // Guardar la venta en historial si no se ha guardado ya
+  let sale = window._currentSaleId ? sales.find(s => s.id === window._currentSaleId) : null;
+  if (!sale) {
+    sale = saveSaleFromCart();
+    if (!sale) return;
+    renderHistory();
+    renderInventory();
+    toast('Venta guardada en historial ✅');
   }
 
-  // Número con código de México
-  const telefono = '52' + num;
-  window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank');
+  // Guardar número en la venta
+  sale.phone = num;
+  saveAll();
+
+  // Construir mensaje
+  const lineas = sale.items.map(i => `• ${i.name} x${i.qty} — $${(i.sellPrice*i.qty).toFixed(2)}`).join('\n');
+  const msg = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date(sale.date).toLocaleDateString('es-MX')}\n👤 *${sale.customer}*\n\n${lineas}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${sale.total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
+
+  // Abrir directo la app de WhatsApp
+  window.location.href = `whatsapp://send?phone=52${num}&text=${encodeURIComponent(msg)}`;
   document.getElementById('waNumeroNuevo').value = '';
-  toast('Abriendo WhatsApp...');
 }
 
 function waYEtiqueta() {

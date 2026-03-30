@@ -878,15 +878,51 @@ function changeQtyMobile(id, delta) {
 function waNumNuevoMobEnviar() {
   const num = document.getElementById('waNumNuevoMob').value.trim().replace(/\D/g,'');
   if (num.length !== 10) { toast('Escribe los 10 dígitos del número', 'error'); return; }
-  const customer = document.getElementById('ventaCliente').value.trim() || 'Clienta';
+
+  const customer = document.getElementById('ventaCliente').value.trim();
+  if (!customer) { toast('Escribe el nombre de la clienta primero', 'error'); return; }
   if (!cart.length) { toast('El carrito está vacío', 'error'); return; }
+
+  // Guardar la venta en historial automáticamente
   const total  = cart.reduce((s,i) => s + i.sellPrice*i.qty, 0);
-  const lineas = cart.map(i => `• ${i.name} x${i.qty} — $${(i.sellPrice*i.qty).toFixed(2)}`).join('\n');
-  const msg    = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date().toLocaleDateString('es-MX')}\n👤 *${customer}*\n\n${lineas}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
-  const telefono = '52' + num;
-  window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank');
+  const profit = cart.reduce((s,i) => s + (i.sellPrice-i.buyPrice)*i.qty, 0);
+  const sale = {
+    id: Date.now().toString(),
+    date: new Date().toISOString(),
+    customer,
+    phone: num,
+    items: cart.map(i => ({...i})),
+    total, profit, inCut: false,
+  };
+
+  // Guardar cliente
+  if (!cfg.customers) cfg.customers = [];
+  if (!cfg.customers.includes(customer)) cfg.customers.push(customer);
+
+  // Descontar stock
+  products = products.map(p => {
+    const ci = cart.find(i => i.id === p.id);
+    return ci ? {...p, stock: p.stock - ci.qty} : p;
+  });
+
+  sales.push(sale);
+  saveData();
+
+  // Limpiar carrito
+  cart = [];
+  document.getElementById('ventaCliente').value = '';
+  updateCartUI();
+  renderInventario();
+
+  // Construir mensaje y abrir WhatsApp app
+  const lineas = sale.items.map(i => `• ${i.name} x${i.qty} — $${(i.sellPrice*i.qty).toFixed(2)}`).join('\n');
+  const msg = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date(sale.date).toLocaleDateString('es-MX')}\n👤 *${sale.customer}*\n\n${lineas}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${sale.total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
+
   document.getElementById('waNumNuevoMob').value = '';
-  toast('Abriendo WhatsApp...');
+  toast('✅ Venta guardada — abriendo WhatsApp');
+  setTimeout(() => {
+    window.location.href = `whatsapp://send?phone=52${num}&text=${encodeURIComponent(msg)}`;
+  }, 500);
 }
 
 async function completarVenta() {
