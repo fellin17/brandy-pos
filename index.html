@@ -332,7 +332,9 @@ return QRCode;
       <div id="lowStockAlert" style="display:none;margin-bottom:12px"></div>
 
       <div class="input-group" style="margin-bottom:12px">
-        <input class="input" id="invSearch" placeholder="🔍 Buscar en inventario..." oninput="renderInventory()">
+        <input class="input" id="invSearch" placeholder="🔍 Buscar en inventario..."
+          oninput="renderInventory();_invIdx=-1"
+          onkeydown="invSearchKeydown(event)">
       </div>
 
       <div class="card">
@@ -851,7 +853,11 @@ function toast(msg, type = 'success') {
 }
 
 // ─── CART ─────────────────────────────────────────────────────────────────────
+// ─── ÍNDICE ACTIVO EN RESULTADOS ──────────────────────────────────────────────
+let _searchIdx = -1;
+
 function searchProducts() {
+  _searchIdx = -1;
   const q = document.getElementById('posSearch').value.trim().toLowerCase();
   const res = document.getElementById('searchResults');
   if (!q) { res.style.display = 'none'; return; }
@@ -863,8 +869,8 @@ function searchProducts() {
     res.style.display = 'block';
     return;
   }
-  res.innerHTML = found.map(p => `
-    <div class="search-item" onclick="addToCart('${p.id}')">
+  res.innerHTML = found.map((p, i) => `
+    <div class="search-item" id="sri-${i}" onclick="addToCart('${p.id}')" data-id="${p.id}">
       <div>
         <strong>${p.name}</strong>
         ${p.barcode ? `<span style="color:var(--muted);font-size:11px;margin-left:6px">${p.barcode}</span>` : ''}
@@ -878,10 +884,34 @@ function searchProducts() {
   res.style.display = 'block';
 }
 
+function highlightSearchItem(items, idx) {
+  items.forEach((el, i) => {
+    el.style.background = i === idx ? 'var(--accent-light)' : '';
+    el.style.borderLeft  = i === idx ? '3px solid var(--accent)' : '';
+  });
+  if (items[idx]) items[idx].scrollIntoView({ block: 'nearest' });
+}
+
 function searchKeydown(e) {
+  const res   = document.getElementById('searchResults');
+  const items = res ? [...res.querySelectorAll('.search-item[data-id]')] : [];
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _searchIdx = Math.min(_searchIdx + 1, items.length - 1);
+    highlightSearchItem(items, _searchIdx);
+    return;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _searchIdx = Math.max(_searchIdx - 1, 0);
+    highlightSearchItem(items, _searchIdx);
+    return;
+  }
   if (e.key === 'Escape') {
-    document.getElementById('searchResults').style.display = 'none';
+    res.style.display = 'none';
     document.getElementById('posSearch').value = '';
+    _searchIdx = -1;
     return;
   }
   if (e.key === 'Enter') {
@@ -889,25 +919,37 @@ function searchKeydown(e) {
     const q = document.getElementById('posSearch').value.trim();
     if (!q) return;
 
-    // Buscar exacto por código de barras primero
+    // Si hay un ítem seleccionado con ↑↓, agregarlo
+    if (_searchIdx >= 0 && items[_searchIdx]) {
+      const id = items[_searchIdx].dataset.id;
+      addToCart(id);
+      _searchIdx = -1;
+      return;
+    }
+
+    // Buscar exacto por código de barras
     const byBarcode = products.find(p => p.barcode && p.barcode === q);
     if (byBarcode) {
       addToCart(byBarcode.id);
       document.getElementById('posSearch').value = '';
-      document.getElementById('searchResults').style.display = 'none';
+      res.style.display = 'none';
       document.getElementById('posSearch').focus();
       return;
     }
 
-    // Si solo hay un resultado en la lista, agregarlo
+    // Si solo hay un resultado, agregarlo directo
     const filtered = products.filter(p =>
       p.name.toLowerCase().includes(q.toLowerCase()) || (p.barcode && p.barcode.includes(q))
     );
     if (filtered.length === 1) {
       addToCart(filtered[0].id);
       document.getElementById('posSearch').value = '';
-      document.getElementById('searchResults').style.display = 'none';
+      res.style.display = 'none';
       document.getElementById('posSearch').focus();
+    } else if (filtered.length > 1 && items.length > 0) {
+      // Hay varios resultados — seleccionar el primero con ↓
+      _searchIdx = 0;
+      highlightSearchItem(items, _searchIdx);
     }
   }
 }
@@ -1592,6 +1634,47 @@ function renderHistory() {
 }
 
 // ─── INVENTORY ────────────────────────────────────────────────────────────────
+// ─── NAVEGACIÓN TECLADO EN INVENTARIO ─────────────────────────────────────────
+let _invIdx = -1;
+
+function invSearchKeydown(e) {
+  const rows = [...document.querySelectorAll('#inventoryTable .inv-row')];
+  if (!rows.length) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _invIdx = Math.min(_invIdx + 1, rows.length - 1);
+    highlightInvRow(rows);
+    return;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _invIdx = Math.max(_invIdx - 1, 0);
+    highlightInvRow(rows);
+    return;
+  }
+  if (e.key === 'Enter' && _invIdx >= 0 && rows[_invIdx]) {
+    e.preventDefault();
+    const id = rows[_invIdx].dataset.id;
+    openProductModal(id);
+    _invIdx = -1;
+    return;
+  }
+  if (e.key === 'Escape') {
+    document.getElementById('invSearch').value = '';
+    renderInventory();
+    _invIdx = -1;
+  }
+}
+
+function highlightInvRow(rows) {
+  rows.forEach((row, i) => {
+    row.style.background = i === _invIdx ? 'var(--accent-light)' : '';
+    row.style.borderLeft  = i === _invIdx ? '3px solid var(--accent)' : '';
+  });
+  if (rows[_invIdx]) rows[_invIdx].scrollIntoView({ block: 'nearest' });
+}
+
 function renderInventory() {
   const q = (document.getElementById('invSearch')?.value || '').toLowerCase();
   const list = q ? products.filter(p => p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q)) : products;
@@ -1638,7 +1721,8 @@ function renderInventory() {
           : p.stock <= 10
           ? ' <span class="tag tag-orange">⚠ Bajo</span>'
           : '';
-        return `<tr>
+        return `<tr class="inv-row" data-id="${p.id}" style="cursor:pointer" onclick="openProductModal('${p.id}')"
+          onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background=''">
           <td style="font-size:11px;color:var(--muted)">${p.barcode||'—'}</td>
           <td><strong>${p.name}</strong></td>
           <td style="text-align:right;color:var(--red)">${fmt(p.buyPrice)}</td>
