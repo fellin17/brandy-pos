@@ -221,6 +221,20 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
     </div>
   </div>
 
+  <!-- Enviar a número nuevo -->
+  <div style="margin:0 0 12px;border:1.5px solid #25D366;border-radius:10px;padding:12px;background:#f0fdf4">
+    <div style="font-size:11px;font-weight:700;color:#16a34a;margin-bottom:8px;text-transform:uppercase">📲 Enviar nota a número nuevo</div>
+    <div style="display:flex;gap:8px">
+      <input type="tel" id="waNumNuevoMob" placeholder="10 dígitos ej: 5512345678"
+        maxlength="10" inputmode="numeric"
+        style="flex:1;padding:12px;border:1px solid #86efac;border-radius:8px;font-size:14px;outline:none;font-family:inherit">
+      <button onclick="waNumNuevoMobEnviar()"
+        style="background:#25D366;color:white;border:none;border-radius:8px;padding:0 16px;font-weight:800;cursor:pointer;font-size:14px;touch-action:manipulation;white-space:nowrap">
+        Enviar
+      </button>
+    </div>
+  </div>
+
   <div style="height:80px"></div>
 </div>
 
@@ -859,6 +873,20 @@ function changeQtyMobile(id, delta) {
   else if (newQty > item.stock) { toast('Sin más stock', 'error'); return; }
   else { item.qty = newQty; }
   updateCartUI();
+}
+
+function waNumNuevoMobEnviar() {
+  const num = document.getElementById('waNumNuevoMob').value.trim().replace(/\D/g,'');
+  if (num.length !== 10) { toast('Escribe los 10 dígitos del número', 'error'); return; }
+  const customer = document.getElementById('ventaCliente').value.trim() || 'Clienta';
+  if (!cart.length) { toast('El carrito está vacío', 'error'); return; }
+  const total  = cart.reduce((s,i) => s + i.sellPrice*i.qty, 0);
+  const lineas = cart.map(i => `• ${i.name} x${i.qty} — $${(i.sellPrice*i.qty).toFixed(2)}`).join('\n');
+  const msg    = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date().toLocaleDateString('es-MX')}\n👤 *${customer}*\n\n${lineas}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
+  const telefono = '52' + num;
+  window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank');
+  document.getElementById('waNumNuevoMob').value = '';
+  toast('Abriendo WhatsApp...');
 }
 
 async function completarVenta() {

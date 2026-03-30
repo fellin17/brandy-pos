@@ -299,6 +299,20 @@ return QRCode;
                 <button class="btn btn-ghost btn-block" id="btnWA" onclick="shareLastWhatsApp()" style="font-size:13px;background:#25D366;color:white;border:none">
                   📲 Enviar WhatsApp &nbsp;<kbd>F1</kbd>
                 </button>
+                <!-- Enviar a número nuevo -->
+                <div style="border:1.5px solid #25D366;border-radius:8px;padding:10px;background:#f0fdf4">
+                  <div style="font-size:11px;font-weight:700;color:#16a34a;margin-bottom:6px;text-transform:uppercase">📲 Enviar a número nuevo (sin guardar)</div>
+                  <div style="display:flex;gap:6px">
+                    <input type="tel" id="waNumeroNuevo" placeholder="10 dígitos ej: 5512345678"
+                      maxlength="10" inputmode="numeric"
+                      style="flex:1;padding:8px 10px;border:1px solid #86efac;border-radius:6px;font-size:13px;outline:none;font-family:inherit"
+                      onkeydown="if(event.key==='Enter') waNumeroNuevoEnviar()">
+                    <button onclick="waNumeroNuevoEnviar()"
+                      style="background:#25D366;color:white;border:none;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:13px">
+                      Enviar
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1368,6 +1382,33 @@ function saveSaleFromCart() {
   window._currentSaleId = sale.id;
   renderInventory();
   return sale;
+}
+
+function waNumeroNuevoEnviar() {
+  const num = document.getElementById('waNumeroNuevo').value.trim().replace(/\D/g,'');
+  if (num.length !== 10) { toast('Escribe los 10 dígitos del número', 'error'); return; }
+
+  const customer = document.getElementById('posCustomer').value.trim() || 'Clienta';
+  // Buscar la última nota de este carrito
+  const sale = window._currentSaleId ? sales.find(s => s.id === window._currentSaleId) : null;
+
+  let msg = '';
+  if (sale) {
+    const lineas = sale.items.map(i => `• ${i.name} x${i.qty} — $${(i.sellPrice*i.qty).toFixed(2)}`).join('\n');
+    msg = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date(sale.date).toLocaleDateString('es-MX')}\n👤 *${sale.customer}*\n\n${lineas}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${sale.total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
+  } else {
+    // Si no hay venta completada, enviar el carrito actual
+    if (!cart.length) { toast('Agrega productos primero', 'error'); return; }
+    const total  = cart.reduce((s,i) => s + i.sellPrice*i.qty, 0);
+    const lineas = cart.map(i => `• ${i.name} x${i.qty} — $${(i.sellPrice*i.qty).toFixed(2)}`).join('\n');
+    msg = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date().toLocaleDateString('es-MX')}\n👤 *${customer}*\n\n${lineas}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
+  }
+
+  // Número con código de México
+  const telefono = '52' + num;
+  window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank');
+  document.getElementById('waNumeroNuevo').value = '';
+  toast('Abriendo WhatsApp...');
 }
 
 function waYEtiqueta() {
