@@ -717,19 +717,28 @@ return QRCode;
 <!-- ═══════════ TOAST ═══════════ -->
 <!-- ═══════════ MODAL: EDITAR NOTA ═══════════ -->
 <div class="modal-bg" id="modalEditNota">
-  <div class="modal" style="max-width:500px">
+  <div class="modal" style="max-width:600px">
     <div class="modal-header">
-      <h3>✏️ Editar Nota</h3>
+      <h3>✏️ Editar Nota Completa</h3>
       <button class="close-btn" onclick="cerrarEditNota()">×</button>
     </div>
     <div class="modal-body">
+      <!-- Nombre -->
       <div class="input-group">
         <label>👤 Nombre de la clienta</label>
         <input class="input" id="editNotaCliente" placeholder="Nombre de la clienta">
       </div>
-      <div id="editNotaItems" style="margin-bottom:12px"></div>
-      <div style="background:var(--accent-light);border-radius:8px;padding:12px;font-size:13px;color:var(--muted)">
-        💡 Puedes cambiar el nombre y las cantidades. Para agregar o quitar productos haz una nueva nota.
+
+      <!-- Productos actuales -->
+      <div style="font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Productos en la nota</div>
+      <div id="editNotaItems" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px"></div>
+
+      <!-- Agregar producto -->
+      <div style="font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">➕ Agregar producto</div>
+      <div class="search-wrap" style="margin-bottom:4px">
+        <input class="input" id="editNotaSearch" placeholder="Busca por nombre o código..."
+          oninput="editNotaSearchProducts()" autocomplete="off">
+        <div class="search-results" id="editNotaSearchResults" style="display:none;max-height:180px;overflow-y:auto"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -2277,42 +2286,92 @@ function escJs(s)  { return String(s).replace(/'/g,"\\'"); }
 function safe(s)   { return String(s).replace(/[^a-zA-Z0-9_\-]/g,'_'); }
 
 // ─── ALERTA DE STOCK BAJO ─────────────────────────────────────────────────────
-// ─── EDITAR Y ELIMINAR NOTAS ──────────────────────────────────────────────────
+// ─── EDITAR NOTA COMPLETA ─────────────────────────────────────────────────────
 let _editNotaId = null;
+let _editItems  = [];
 
 function editarNota(id) {
   const sale = sales.find(s => s.id === id);
   if (!sale) return;
   _editNotaId = id;
+  _editItems  = sale.items.map(i => ({...i}));
   document.getElementById('editNotaCliente').value = sale.customer;
-  document.getElementById('editNotaItems').innerHTML = `
-    <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--muted);text-transform:uppercase">Productos</div>
-    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
-      ${sale.items.map((item, i) => `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
-          <div style="flex:1;font-weight:600;font-size:13px">${item.name}</div>
-          <div style="font-size:12px;color:var(--muted)">${fmt(item.sellPrice)} c/u</div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <button onclick="cambiarQtyNota(${i},-1)" style="width:28px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:6px;cursor:pointer;font-size:16px">−</button>
-            <input type="number" id="editQty_${i}" value="${item.qty}" min="1"
-              style="width:45px;text-align:center;border:1px solid var(--border);border-radius:6px;padding:4px;font-size:13px">
-            <button onclick="cambiarQtyNota(${i},1)" style="width:28px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:6px;cursor:pointer;font-size:16px">+</button>
-          </div>
-          <div style="font-weight:700;font-size:13px;color:var(--accent);min-width:60px;text-align:right" id="editSubtotal_${i}">
-            ${fmt(item.sellPrice * item.qty)}
-          </div>
-        </div>`).join('')}
-    </div>`;
+  document.getElementById('editNotaSearch').value  = '';
+  document.getElementById('editNotaSearchResults').style.display = 'none';
+  renderEditItems();
   document.getElementById('modalEditNota').classList.add('open');
+  setTimeout(() => document.getElementById('editNotaCliente').select(), 100);
 }
 
-function cambiarQtyNota(idx, delta) {
-  const input = document.getElementById(`editQty_${idx}`);
-  const newVal = Math.max(1, parseInt(input.value) + delta);
-  input.value = newVal;
-  const sale = sales.find(s => s.id === _editNotaId);
-  if (sale && sale.items[idx])
-    document.getElementById(`editSubtotal_${idx}`).textContent = fmt(sale.items[idx].sellPrice * newVal);
+function renderEditItems() {
+  const box = document.getElementById('editNotaItems');
+  if (!_editItems.length) {
+    box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--muted);font-size:13px">Sin productos — agrega uno abajo</div>';
+    return;
+  }
+  const total = _editItems.reduce((t,i) => t + i.sellPrice*i.qty, 0);
+  box.innerHTML = _editItems.map((item, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <div style="flex:1;min-width:120px">
+        <div style="font-weight:700;font-size:13px">${item.name}</div>
+        <div style="font-size:11px;color:var(--muted)">${fmt(item.sellPrice)} c/u</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button onclick="editItemQty(${i},-1)" style="width:28px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:6px;cursor:pointer;font-size:16px">−</button>
+        <input type="number" value="${item.qty}" min="1"
+          onchange="editItemQtySet(${i},this.value)"
+          style="width:44px;text-align:center;border:1px solid var(--border);border-radius:6px;padding:4px;font-size:13px">
+        <button onclick="editItemQty(${i},1)" style="width:28px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:6px;cursor:pointer;font-size:16px">+</button>
+      </div>
+      <div style="font-weight:800;font-size:13px;color:var(--accent);min-width:60px;text-align:right">${fmt(item.sellPrice*item.qty)}</div>
+      <button onclick="editItemRemove(${i})" style="background:var(--red-light);color:var(--red);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:14px;font-weight:700">✕</button>
+    </div>`).join('')
+  + `<div style="padding:10px 14px;text-align:right;font-weight:800;font-size:15px;color:var(--accent);border-top:2px solid var(--border)">
+      Total: ${fmt(total)}
+    </div>`;
+}
+
+function editItemQty(idx, delta) {
+  _editItems[idx].qty = Math.max(1, _editItems[idx].qty + delta);
+  renderEditItems();
+}
+function editItemQtySet(idx, val) {
+  _editItems[idx].qty = Math.max(1, parseInt(val) || 1);
+  renderEditItems();
+}
+function editItemRemove(idx) {
+  _editItems.splice(idx, 1);
+  renderEditItems();
+}
+
+function editNotaSearchProducts() {
+  const q   = document.getElementById('editNotaSearch').value.trim().toLowerCase();
+  const res = document.getElementById('editNotaSearchResults');
+  if (!q) { res.style.display = 'none'; return; }
+  const found = products.filter(p =>
+    p.name.toLowerCase().includes(q) || (p.barcode && p.barcode.includes(q))
+  );
+  if (!found.length) { res.style.display = 'none'; return; }
+  res.innerHTML = found.map(p => `
+    <div class="search-item" onclick="editNotaAgregarProducto('${p.id}')">
+      <div>
+        <strong>${p.name}</strong>
+        <span class="tag ${p.stock>0?'tag-green':'tag-red'}" style="margin-left:6px">${p.stock>0?'Stock: '+p.stock:'Sin stock'}</span>
+      </div>
+      <strong style="color:var(--accent)">${fmt(p.sellPrice)}</strong>
+    </div>`).join('');
+  res.style.display = 'block';
+}
+
+function editNotaAgregarProducto(prodId) {
+  const p = products.find(x => x.id === prodId);
+  if (!p) return;
+  const ex = _editItems.find(i => i.id === prodId);
+  if (ex) ex.qty++;
+  else _editItems.push({id:p.id, name:p.name, buyPrice:p.buyPrice, sellPrice:p.sellPrice, qty:1, stock:p.stock});
+  document.getElementById('editNotaSearch').value = '';
+  document.getElementById('editNotaSearchResults').style.display = 'none';
+  renderEditItems();
 }
 
 function guardarEditNota() {
@@ -2320,19 +2379,20 @@ function guardarEditNota() {
   if (!sale) return;
   const nuevoNombre = document.getElementById('editNotaCliente').value.trim();
   if (!nuevoNombre) { toast('El nombre no puede estar vacío', 'error'); return; }
+  if (!_editItems.length) { toast('La nota debe tener al menos un producto', 'error'); return; }
 
-  // Ajustar stock según diferencia de cantidades
-  sale.items.forEach((item, i) => {
-    const qtyAnterior = item.qty;
-    const qtyNueva   = parseInt(document.getElementById(`editQty_${i}`).value) || 1;
-    const diff = qtyAnterior - qtyNueva;
-    products = products.map(p => p.id === item.id ? {...p, stock: p.stock + diff} : p);
-    item.qty = qtyNueva;
+  // Restaurar stock anterior y descontar el nuevo
+  sale.items.forEach(item => {
+    products = products.map(p => p.id===item.id ? {...p, stock:p.stock+item.qty} : p);
+  });
+  _editItems.forEach(item => {
+    products = products.map(p => p.id===item.id ? {...p, stock:p.stock-item.qty} : p);
   });
 
   sale.customer = nuevoNombre;
-  sale.total  = sale.items.reduce((t,i) => t + i.sellPrice * i.qty, 0);
-  sale.profit = sale.items.reduce((t,i) => t + (i.sellPrice - i.buyPrice) * i.qty, 0);
+  sale.items    = _editItems.map(i => ({...i}));
+  sale.total    = sale.items.reduce((t,i) => t+i.sellPrice*i.qty, 0);
+  sale.profit   = sale.items.reduce((t,i) => t+(i.sellPrice-i.buyPrice)*i.qty, 0);
 
   saveAll();
   renderHistory();
@@ -2343,16 +2403,18 @@ function guardarEditNota() {
 
 function cerrarEditNota() {
   document.getElementById('modalEditNota').classList.remove('open');
+  const res = document.getElementById('editNotaSearchResults');
+  if (res) res.style.display = 'none';
   _editNotaId = null;
+  _editItems  = [];
 }
 
 function eliminarNota(id) {
   const sale = sales.find(s => s.id === id);
   if (!sale) return;
-  if (!confirm(`¿Eliminar la nota de ${sale.customer} por ${fmt(sale.total)}?\n\nEl stock de los productos será restaurado.`)) return;
-  // Devolver stock
+  if (!confirm(`¿Eliminar la nota de ${sale.customer} por ${fmt(sale.total)}?\n\nEl stock será restaurado.`)) return;
   sale.items.forEach(item => {
-    products = products.map(p => p.id === item.id ? {...p, stock: p.stock + item.qty} : p);
+    products = products.map(p => p.id===item.id ? {...p, stock:p.stock+item.qty} : p);
   });
   sales = sales.filter(s => s.id !== id);
   saveAll();
