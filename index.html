@@ -715,6 +715,30 @@ return QRCode;
 </div>
 
 <!-- ═══════════ TOAST ═══════════ -->
+<!-- ═══════════ MODAL: EDITAR NOTA ═══════════ -->
+<div class="modal-bg" id="modalEditNota">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h3>✏️ Editar Nota</h3>
+      <button class="close-btn" onclick="cerrarEditNota()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="input-group">
+        <label>👤 Nombre de la clienta</label>
+        <input class="input" id="editNotaCliente" placeholder="Nombre de la clienta">
+      </div>
+      <div id="editNotaItems" style="margin-bottom:12px"></div>
+      <div style="background:var(--accent-light);border-radius:8px;padding:12px;font-size:13px;color:var(--muted)">
+        💡 Puedes cambiar el nombre y las cantidades. Para agregar o quitar productos haz una nueva nota.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarEditNota()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEditNota()">💾 Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- ═══════════ SCRIPT ═══════════ -->
@@ -1677,6 +1701,8 @@ function renderHistory() {
             <button class="btn btn-ghost btn-sm" onclick='generateTicketPDF(${JSON.stringify(s)})'>📄 PDF</button>
             <button class="btn btn-ghost btn-sm" onclick="printLabel('${escJs(s.customer)}',${s.total},'${s.date}')">🏷️ Etiqueta</button>
             <button class="btn btn-sm" style="background:#25D366;color:white;border:none;border-radius:6px;font-weight:700;cursor:pointer;padding:5px 10px;font-size:12px" onclick='shareWhatsApp(${JSON.stringify(s)})'>📲 WhatsApp</button>
+            <button class="btn btn-sm" style="background:#f59e0b;color:white;border:none;border-radius:6px;font-weight:700;cursor:pointer;padding:5px 10px;font-size:12px" onclick="editarNota('${s.id}')">✏️ Editar</button>
+            <button class="btn btn-sm" style="background:var(--red);color:white;border:none;border-radius:6px;font-weight:700;cursor:pointer;padding:5px 10px;font-size:12px" onclick="eliminarNota('${s.id}')">🗑️ Eliminar</button>
           </div>
           <div style="text-align:center;flex-shrink:0">
             <div class="qr-placeholder" data-qr="${encodeURIComponent(getSaleQRText(s))}"
@@ -2251,6 +2277,90 @@ function escJs(s)  { return String(s).replace(/'/g,"\\'"); }
 function safe(s)   { return String(s).replace(/[^a-zA-Z0-9_\-]/g,'_'); }
 
 // ─── ALERTA DE STOCK BAJO ─────────────────────────────────────────────────────
+// ─── EDITAR Y ELIMINAR NOTAS ──────────────────────────────────────────────────
+let _editNotaId = null;
+
+function editarNota(id) {
+  const sale = sales.find(s => s.id === id);
+  if (!sale) return;
+  _editNotaId = id;
+  document.getElementById('editNotaCliente').value = sale.customer;
+  document.getElementById('editNotaItems').innerHTML = `
+    <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--muted);text-transform:uppercase">Productos</div>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      ${sale.items.map((item, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
+          <div style="flex:1;font-weight:600;font-size:13px">${item.name}</div>
+          <div style="font-size:12px;color:var(--muted)">${fmt(item.sellPrice)} c/u</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button onclick="cambiarQtyNota(${i},-1)" style="width:28px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:6px;cursor:pointer;font-size:16px">−</button>
+            <input type="number" id="editQty_${i}" value="${item.qty}" min="1"
+              style="width:45px;text-align:center;border:1px solid var(--border);border-radius:6px;padding:4px;font-size:13px">
+            <button onclick="cambiarQtyNota(${i},1)" style="width:28px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:6px;cursor:pointer;font-size:16px">+</button>
+          </div>
+          <div style="font-weight:700;font-size:13px;color:var(--accent);min-width:60px;text-align:right" id="editSubtotal_${i}">
+            ${fmt(item.sellPrice * item.qty)}
+          </div>
+        </div>`).join('')}
+    </div>`;
+  document.getElementById('modalEditNota').classList.add('open');
+}
+
+function cambiarQtyNota(idx, delta) {
+  const input = document.getElementById(`editQty_${idx}`);
+  const newVal = Math.max(1, parseInt(input.value) + delta);
+  input.value = newVal;
+  const sale = sales.find(s => s.id === _editNotaId);
+  if (sale && sale.items[idx])
+    document.getElementById(`editSubtotal_${idx}`).textContent = fmt(sale.items[idx].sellPrice * newVal);
+}
+
+function guardarEditNota() {
+  const sale = sales.find(s => s.id === _editNotaId);
+  if (!sale) return;
+  const nuevoNombre = document.getElementById('editNotaCliente').value.trim();
+  if (!nuevoNombre) { toast('El nombre no puede estar vacío', 'error'); return; }
+
+  // Ajustar stock según diferencia de cantidades
+  sale.items.forEach((item, i) => {
+    const qtyAnterior = item.qty;
+    const qtyNueva   = parseInt(document.getElementById(`editQty_${i}`).value) || 1;
+    const diff = qtyAnterior - qtyNueva;
+    products = products.map(p => p.id === item.id ? {...p, stock: p.stock + diff} : p);
+    item.qty = qtyNueva;
+  });
+
+  sale.customer = nuevoNombre;
+  sale.total  = sale.items.reduce((t,i) => t + i.sellPrice * i.qty, 0);
+  sale.profit = sale.items.reduce((t,i) => t + (i.sellPrice - i.buyPrice) * i.qty, 0);
+
+  saveAll();
+  renderHistory();
+  renderInventory();
+  cerrarEditNota();
+  toast('✅ Nota actualizada correctamente');
+}
+
+function cerrarEditNota() {
+  document.getElementById('modalEditNota').classList.remove('open');
+  _editNotaId = null;
+}
+
+function eliminarNota(id) {
+  const sale = sales.find(s => s.id === id);
+  if (!sale) return;
+  if (!confirm(`¿Eliminar la nota de ${sale.customer} por ${fmt(sale.total)}?\n\nEl stock de los productos será restaurado.`)) return;
+  // Devolver stock
+  sale.items.forEach(item => {
+    products = products.map(p => p.id === item.id ? {...p, stock: p.stock + item.qty} : p);
+  });
+  sales = sales.filter(s => s.id !== id);
+  saveAll();
+  renderHistory();
+  renderInventory();
+  toast('🗑️ Nota eliminada y stock restaurado');
+}
+
 function checkStockAlerts(updatedProducts) {
   const lowItems = updatedProducts.filter(p => p.stock > 0 && p.stock <= 10);
   if (!lowItems.length) return;
