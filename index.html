@@ -1413,6 +1413,8 @@ function waNumeroNuevoEnviar() {
   // Abrir directo la app de WhatsApp
   window.location.href = `whatsapp://send?phone=52${num}&text=${encodeURIComponent(msg)}`;
   document.getElementById('waNumeroNuevo').value = '';
+  // Limpiar pantalla para nueva venta
+  setTimeout(() => clearCartUI(), 800);
 }
 
 function waYEtiqueta() {
