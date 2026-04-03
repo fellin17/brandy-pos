@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#1d4ed8">
+<meta name="theme-color" content="#be185d">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Brandy Móvil">
-<title>Brandy POS Móvil</title>
+<meta name="apple-mobile-web-app-title" content="Naye Móvil">
+<title>Naye POS Móvil</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -16,25 +16,35 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 :root {
-  --blue: #1d4ed8; --blue-light: #eff6ff;
+  --blue: #be185d; --blue-light: #fdf2f8;
+  --fuchsia: #a21caf; --fuchsia-light: #fdf4ff;
   --green: #16a34a; --green-light: #dcfce7;
   --red: #dc2626; --red-light: #fee2e2;
   --orange: #ea580c; --orange-light: #fff7ed;
-  --bg: #f4f6f9; --white: #ffffff;
-  --text: #111827; --muted: #6b7280;
-  --border: #e5e7eb;
+  --bg: #fff0f8; --white: #ffffff;
+  --text: #1a0010; --muted: #9d174d;
+  --border: #f9a8d4;
+}
+
+@keyframes pulse-btn {
+  0%, 100% { box-shadow: 0 4px 14px rgba(190,24,93,0.35); }
+  50% { box-shadow: 0 6px 24px rgba(190,24,93,0.6); }
+}
+@keyframes slide-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
 /* HEADER */
-.header { background: var(--blue); color: white; padding: 14px 16px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+.header { background: linear-gradient(135deg, #be185d 0%, #9d174d 50%, #1a0010 100%); color: white; padding: 14px 16px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(190,24,93,0.4); }
 .header h1 { font-size: 17px; font-weight: 800; flex: 1; }
 .header .sync { font-size: 11px; opacity: 0.85; }
 
 /* NAV */
 .nav { display: grid; grid-template-columns: repeat(5, 1fr); background: white; border-bottom: 1px solid var(--border); position: sticky; top: 56px; z-index: 99; }
 .nav button { padding: 12px 4px; border: none; background: transparent; font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; transition: all .15s; touch-action: manipulation; }
-.nav button.active { color: var(--blue); border-bottom-color: var(--blue); background: var(--blue-light); }
+.nav button.active { color: var(--blue); border-bottom-color: var(--blue); background: linear-gradient(to bottom, #fdf2f8, #fff); }
 .nav button span { display: block; font-size: 20px; margin-bottom: 2px; }
 
 /* CONTENT */
@@ -51,17 +61,36 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 .input-group label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
 
 /* BUTTONS */
-.btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 18px; border: none; border-radius: 10px; font-weight: 700; font-size: 15px; cursor: pointer; font-family: inherit; touch-action: manipulation; transition: opacity .15s; width: 100%; margin-bottom: 10px; }
-.btn:active { opacity: 0.8; }
-.btn-blue { background: var(--blue); color: white; }
-.btn-green { background: var(--green); color: white; }
-.btn-orange { background: var(--orange); color: white; }
-.btn-wa { background: #25D366; color: white; }
-.btn-ghost { background: var(--bg); color: var(--text); border: 1.5px solid var(--border); }
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 18px; border: none; border-radius: 12px; font-weight: 700;
+  font-size: 15px; cursor: pointer; font-family: inherit; touch-action: manipulation;
+  transition: all .25s cubic-bezier(.34,1.56,.64,1);
+  width: 100%; margin-bottom: 10px; position: relative; overflow: hidden;
+}
+.btn:active { transform: scale(0.96); }
+.btn:hover { transform: translateY(-2px); }
+.btn-blue {
+  background: linear-gradient(135deg, #be185d, #9d174d);
+  color: white; box-shadow: 0 4px 14px rgba(190,24,93,0.4);
+  animation: pulse-btn 2.5s infinite;
+}
+.btn-blue:hover, .btn-blue:active { animation: none; }
+.btn-green {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: white; box-shadow: 0 4px 14px rgba(22,163,74,0.35);
+}
+.btn-orange {
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+  color: white; box-shadow: 0 4px 14px rgba(234,88,12,0.3);
+}
+.btn-wa { background: #25D366; color: white; box-shadow: 0 4px 14px rgba(37,211,102,0.35); }
+.btn-ghost { background: var(--bg); color: var(--blue); border: 1.5px solid var(--border); }
+.btn-ghost:hover { background: var(--blue-light); }
 .btn-sm { padding: 9px 14px; font-size: 13px; width: auto; margin-bottom: 0; }
 
 /* SCAN BUTTON BIG */
-.scan-big { background: var(--blue); color: white; border: none; border-radius: 16px; padding: 24px; width: 100%; cursor: pointer; font-family: inherit; touch-action: manipulation; margin-bottom: 12px; }
+.scan-big { background: linear-gradient(135deg, #be185d, #a21caf); color: white; border: none; border-radius: 16px; padding: 24px; width: 100%; cursor: pointer; font-family: inherit; touch-action: manipulation; margin-bottom: 12px; box-shadow: 0 6px 20px rgba(190,24,93,0.4); transition: all .25s; } .scan-big:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(190,24,93,0.5); }
 .scan-big .icon { font-size: 52px; display: block; margin-bottom: 8px; }
 .scan-big .label { font-size: 17px; font-weight: 800; display: block; }
 .scan-big .sub { font-size: 12px; opacity: 0.8; margin-top: 4px; display: block; }
@@ -75,7 +104,7 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 .product-item:last-child { border-bottom: none; }
 .product-name { font-weight: 700; font-size: 14px; }
 .product-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
-.product-price { font-weight: 800; font-size: 16px; color: var(--blue); font-family: monospace; }
+.product-price { font-weight: 800; font-size: 16px; color: var(--blue); font-family: monospace; } .product-item { animation: slide-in .2s ease; }
 .tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; }
 .tag-green { background: var(--green-light); color: var(--green); }
 .tag-red { background: var(--red-light); color: var(--red); }
@@ -85,7 +114,7 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 .nota-header { padding: 14px; border-bottom: 1px solid var(--border); }
 .nota-cliente { font-size: 18px; font-weight: 800; }
 .nota-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
-.nota-total { font-size: 22px; font-weight: 900; color: var(--blue); font-family: monospace; }
+.nota-total { font-size: 22px; font-weight: 900; color: var(--blue); font-family: monospace; background: linear-gradient(135deg, #be185d, #a21caf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .nota-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .nota-table th { padding: 8px 14px; text-align: left; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; background: var(--bg); border-bottom: 1px solid var(--border); }
 .nota-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
@@ -96,7 +125,7 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 #toast.show { display: block; }
 #toast.success { background: var(--green); color: white; }
 #toast.error { background: var(--red); color: white; }
-#toast.info { background: var(--blue); color: white; }
+#toast.info { background: linear-gradient(135deg, #be185d, #9d174d); color: white; }
 
 /* VENTA */
 .cart-item { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
@@ -114,7 +143,7 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 .summary-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 12px; z-index: 50; }
 .summary-bar .total-label { font-size: 12px; color: var(--muted); }
 .summary-bar .total-amount { font-size: 22px; font-weight: 900; color: var(--blue); font-family: monospace; flex: 1; }
-.summary-bar .checkout-btn { background: var(--green); color: white; border: none; border-radius: 10px; padding: 12px 20px; font-weight: 800; font-size: 15px; cursor: pointer; touch-action: manipulation; white-space: nowrap; }
+.summary-bar .checkout-btn { background: linear-gradient(135deg, #16a34a, #15803d); color: white; border: none; border-radius: 10px; padding: 12px 20px; font-weight: 800; font-size: 15px; cursor: pointer; touch-action: manipulation; white-space: nowrap; box-shadow: 0 3px 12px rgba(22,163,74,0.4); }
 .has-cart { padding-bottom: 80px; }
 </style>
 </head>
@@ -221,22 +250,33 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
     </div>
   </div>
 
-  <!-- Enviar a número nuevo -->
-  <div style="margin:0 0 12px;border:1.5px solid #25D366;border-radius:10px;padding:12px;background:#f0fdf4">
-    <div style="font-size:11px;font-weight:700;color:#16a34a;margin-bottom:8px;text-transform:uppercase">📲 Enviar nota a número nuevo</div>
+  <!-- Enviar a número nuevo por WhatsApp -->
+  <div style="margin:0 0 10px;border:1.5px solid #25D366;border-radius:10px;padding:12px;background:#f0fdf4">
+    <div style="font-size:11px;font-weight:700;color:#16a34a;margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;gap:6px">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" style="width:14px;height:14px"> WHATSAPP — ENVIAR NOTA A NÚMERO NUEVO
+    </div>
     <div style="display:flex;gap:8px">
       <input type="tel" id="waNumNuevoMob" placeholder="10 dígitos ej: 5512345678"
         maxlength="10" inputmode="numeric"
         style="flex:1;padding:12px;border:1px solid #86efac;border-radius:8px;font-size:14px;outline:none;font-family:inherit">
       <button onclick="waNumNuevoMobEnviar()"
-        style="background:#25D366;color:white;border:none;border-radius:8px;padding:0 16px;font-weight:800;cursor:pointer;font-size:14px;touch-action:manipulation;white-space:nowrap">
-        Enviar
+        style="background:#25D366;color:white;border:none;border-radius:8px;padding:0 16px;font-weight:800;cursor:pointer;font-size:14px;touch-action:manipulation;white-space:nowrap;display:flex;align-items:center;gap:6px">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" style="width:16px;height:16px"> Enviar
       </button>
     </div>
   </div>
 
-  <div style="height:80px"></div>
-</div>
+  <!-- Mandar nota a contacto existente -->
+  <div style="margin:0 0 12px;border:1.5px solid #25D366;border-radius:10px;padding:12px;background:#f0fdf4">
+    <div style="font-size:11px;font-weight:700;color:#16a34a;margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;gap:6px">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" style="width:14px;height:14px"> WHATSAPP — ENVIAR A CONTACTO EXISTENTE
+    </div>
+    <button onclick="mandarPorWhatsApp()"
+      style="width:100%;padding:14px;background:#25D366;color:white;border:none;border-radius:8px;font-weight:800;cursor:pointer;font-size:16px;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:8px">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" style="width:22px;height:22px">
+      Mandar por WhatsApp
+    </button>
+  </div>
 
 <!-- ═══ TAB: NOTAS ═══ -->
 <div id="tab-notas" class="content" style="display:none">
@@ -388,43 +428,129 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
     <div class="card-title">📦 Últimos productos agregados</div>
     <div id="ultimosProductos"></div>
   </div>
-</div>
-<div class="summary-bar" id="summaryBar" style="display:none">
-  <div>
-    <div class="total-label">Total</div>
-    <div class="total-amount" id="cartTotal">$0.00</div>
+
+  <!-- ZONA DE PELIGRO -->
+  <div style="margin-top:24px;margin-bottom:80px">
+    <button onclick="toggleZonaPeligro()"
+      style="width:100%;background:none;border:2px dashed #dc2626;border-radius:12px;
+             padding:14px;color:#dc2626;font-weight:700;font-size:13px;cursor:pointer;
+             touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:8px;
+             transition:all .2s;">
+      ⚠️ Zona de peligro — toca para expandir
+    </button>
+
+    <div id="zonaPeligroPanel" style="display:none;margin-top:10px;
+         background:#fff5f5;border:2px solid #dc2626;border-radius:12px;padding:16px;">
+
+      <div style="text-align:center;margin-bottom:14px">
+        <div style="font-size:28px">☠️</div>
+        <div style="font-weight:800;font-size:14px;color:#dc2626;margin-top:4px">ZONA DE PELIGRO</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px">
+          Esta acción no se puede deshacer. Sé muy cuidadosa.
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+
+        <button onclick="borrarSoloNotas()"
+          style="width:100%;padding:13px;background:white;border:2px solid #dc2626;
+                 border-radius:10px;color:#dc2626;font-weight:700;font-size:13px;
+                 cursor:pointer;touch-action:manipulation;transition:all .2s;">
+          🗒️ Borrar solo notas / historial
+        </button>
+
+        <button onclick="borrarSoloInventario()"
+          style="width:100%;padding:13px;background:white;border:2px solid #ea580c;
+                 border-radius:10px;color:#ea580c;font-weight:700;font-size:13px;
+                 cursor:pointer;touch-action:manipulation;transition:all .2s;">
+          📦 Borrar solo inventario
+        </button>
+
+        <button onclick="borrarTodoMovil()"
+          style="width:100%;padding:14px;background:linear-gradient(135deg,#dc2626,#b91c1c);
+                 border:none;border-radius:10px;color:white;font-weight:800;font-size:14px;
+                 cursor:pointer;touch-action:manipulation;box-shadow:0 4px 14px rgba(220,38,38,0.4);
+                 transition:all .2s;">
+          💣 BORRAR TODO (notas + inventario)
+        </button>
+      </div>
+    </div>
   </div>
-  <button class="checkout-btn" onclick="completarVenta()">✅ Completar</button>
+</div>
+<!-- MODAL DESCUENTO -->
+<div id="descModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:400;align-items:flex-end;justify-content:center">
+  <div style="background:white;border-radius:20px 20px 0 0;width:100%;padding:22px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-weight:800;font-size:17px;color:#be185d">Descuento en nota</div>
+      <button onclick="descModalCerrar()" style="background:#f3f4f6;border:none;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer">x</button>
+    </div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:14px">Subtotal: <strong id="descModalSubtotal"></strong></div>
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px;border:2px solid #f9a8d4;border-radius:10px;cursor:pointer;font-weight:700;font-size:15px">
+        <input type="radio" name="descTipo" value="pct" checked onchange="descModalCalc()"> % Porcentaje
+      </label>
+      <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px;border:2px solid #f9a8d4;border-radius:10px;cursor:pointer;font-weight:700;font-size:15px">
+        <input type="radio" name="descTipo" value="pesos" onchange="descModalCalc()"> $ Pesos
+      </label>
+    </div>
+    <input type="number" id="descModalInput" inputmode="decimal" placeholder="0"
+      oninput="descModalCalc()"
+      style="width:100%;padding:16px;font-size:28px;font-weight:800;text-align:center;border:2px solid #f9a8d4;border-radius:12px;outline:none;margin-bottom:10px;color:#be185d">
+    <div id="descModalResult" style="text-align:center;font-size:15px;font-weight:700;color:#16a34a;min-height:24px;margin-bottom:14px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="descModalAplicar()" style="flex:1;padding:16px;background:linear-gradient(135deg,#be185d,#9d174d);color:white;border:none;border-radius:12px;font-weight:800;font-size:16px;cursor:pointer;touch-action:manipulation">
+        Aplicar
+      </button>
+      <button onclick="descModalQuitar()" style="padding:16px 18px;background:#fee2e2;color:#dc2626;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation">
+        Quitar
+      </button>
+    </div>
+  </div>
+</div>
+<div class="summary-bar" id="summaryBar" style="display:none;flex-direction:column;gap:8px;padding:10px 16px">
+  <div style="display:flex;align-items:center;gap:12px;width:100%">
+    <div style="flex:1">
+      <div class="total-label">Total</div>
+      <div class="total-amount" id="cartTotal">$0.00</div>
+      <div id="descNotaLabel" style="display:none;font-size:11px;color:#16a34a;font-weight:700"></div>
+    </div>
+    <button onclick="abrirDescuentoNota()" style="background:linear-gradient(135deg,#be185d,#9d174d);color:white;border:none;border-radius:10px;padding:10px 14px;font-weight:800;font-size:13px;cursor:pointer;touch-action:manipulation;white-space:nowrap">
+      🏷️ Desc.
+    </button>
+    <button class="checkout-btn" onclick="completarVenta()">✅ Completar</button>
+  </div>
 </div>
 
 <div id="toast"></div>
 
 <script>
 // ─── FIREBASE ─────────────────────────────────────────────────────────────────
+// ⚠️ REEMPLAZA ESTOS VALORES CON TU NUEVO PROYECTO FIREBASE
 const fbCfg = {
   apiKey: "AIzaSyAuJFzKFx1F35f-oD9rnYo01D2HJCGt_C8",
   authDomain: "brandy-skincare-pos.firebaseapp.com",
   projectId: "brandy-skincare-pos",
   storageBucket: "brandy-skincare-pos.firebasestorage.app",
   messagingSenderId: "661572753505",
-  appId: "1:661572753505:web:d4104559379c9189be3220"
+  appId:             "1:661572753505:web:d4104559379c9189be3220"
 };
 let fbDoc = null, fbReady = false;
 try {
   firebase.initializeApp(fbCfg);
-  fbDoc = firebase.firestore().collection('pos').doc('data');
+  fbDoc = firebase.firestore().collection('naye_pos').doc('data');
   fbReady = true;
 } catch(e) { console.warn('Firebase:', e.message); }
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let products = [], sales = [], cuts = [], cfg = { bizName: 'Brandy POS' };
 let cart = [];
+let _descuentoNota = 0;
 
 // ─── LOAD DATA ────────────────────────────────────────────────────────────────
 async function loadData() {
   // Local primero
   try {
-    const local = JSON.parse(localStorage.getItem('pos_backup') || 'null');
+    const local = JSON.parse(localStorage.getItem('naye_pos_backup') || 'null');
     if (local) applyData(local);
   } catch {}
 
@@ -437,7 +563,7 @@ async function loadData() {
       ]);
       if (snap.exists) {
         applyData(snap.data());
-        localStorage.setItem('pos_backup', JSON.stringify(snap.data()));
+        localStorage.setItem('naye_pos_backup', JSON.stringify(snap.data()));
         setSyncStatus('🟢 Sincronizado');
       }
     } catch(e) {
@@ -448,7 +574,7 @@ async function loadData() {
     fbDoc.onSnapshot(snap => {
       if (snap.exists) {
         applyData(snap.data());
-        localStorage.setItem('pos_backup', JSON.stringify(snap.data()));
+        localStorage.setItem('naye_pos_backup', JSON.stringify(snap.data()));
         setSyncStatus('🟢 En línea');
         renderInventario();
         renderNotas();
@@ -472,7 +598,7 @@ function applyData(data) {
 
 async function saveData() {
   const data = { products, sales, cuts, cfg };
-  try { localStorage.setItem('pos_backup', JSON.stringify(data)); } catch {}
+  try { localStorage.setItem('naye_pos_backup', JSON.stringify(data)); } catch {}
   if (fbReady) fbDoc.set(data).catch(() => {});
 }
 
@@ -838,32 +964,125 @@ function updateCartUI() {
   const el = document.getElementById('cartList');
   const bar = document.getElementById('summaryBar');
   const totalEl = document.getElementById('cartTotal');
+  const descLabel = document.getElementById('descNotaLabel');
   if (!el) return;
 
   if (!cart.length) {
+    _descuentoNota = 0;
     el.innerHTML = '<div class="empty"><div class="icon">🛒</div><p>Agrega productos</p></div>';
     bar.style.display = 'none';
     return;
   }
 
-  const total = cart.reduce((s, i) => s + i.sellPrice * i.qty, 0);
-  totalEl.textContent = '$' + total.toFixed(2);
+  const subtotal = cart.reduce((s, i) => {
+    const desc = i.descuento || 0;
+    return s + i.sellPrice * (1 - desc/100) * i.qty;
+  }, 0);
+  const totalFinal = Math.max(0, subtotal - _descuentoNota);
+
+  totalEl.textContent = '$' + totalFinal.toFixed(2);
+  if (descLabel) {
+    if (_descuentoNota > 0) {
+      descLabel.style.display = '';
+      descLabel.textContent = 'Desc. nota: -$' + _descuentoNota.toFixed(2);
+    } else {
+      descLabel.style.display = 'none';
+    }
+  }
   bar.style.display = '';
 
-  el.innerHTML = cart.map(i => `
-    <div class="cart-item">
-      <div style="flex:1">
-        <div style="font-weight:700;font-size:14px">${i.name}</div>
-        <div style="font-size:12px;color:var(--muted)">$${i.sellPrice.toFixed(2)} c/u → $${(i.sellPrice * i.qty).toFixed(2)}</div>
+  el.innerHTML = cart.map(i => {
+    const desc = i.descuento || 0;
+    const precioConDesc = i.sellPrice * (1 - desc/100);
+    return `
+    <div class="cart-item" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px">${i.name}</div>
+          <div style="font-size:12px;color:var(--muted)">
+            ${desc > 0
+              ? `<span style="text-decoration:line-through">$${i.sellPrice.toFixed(2)}</span> <span style="color:#16a34a;font-weight:700">$${precioConDesc.toFixed(2)}</span> c/u`
+              : `$${i.sellPrice.toFixed(2)} c/u`}
+            → <strong>$${(precioConDesc * i.qty).toFixed(2)}</strong>
+          </div>
+        </div>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQtyMobile('${i.id}', -1)">−</button>
+          <span class="qty-num">${i.qty}</span>
+          <button class="qty-btn" onclick="changeQtyMobile('${i.id}', 1)">+</button>
+        </div>
       </div>
-      <div class="qty-ctrl">
-        <button class="qty-btn" onclick="changeQtyMobile('${i.id}', -1)">−</button>
-        <span class="qty-num">${i.qty}</span>
-        <button class="qty-btn" onclick="changeQtyMobile('${i.id}', 1)">+</button>
+      <!-- Descuento por producto -->
+      <div style="display:flex;align-items:center;gap:8px;background:#fdf2f8;border-radius:8px;padding:6px 10px">
+        <span style="font-size:12px;color:#9d174d;font-weight:700">🏷️ Desc.:</span>
+        <div style="display:flex;align-items:center;gap:4px;flex:1">
+          <input type="number" id="desc_${i.id}" value="${desc}" min="0" max="100" step="1"
+            inputmode="numeric"
+            onkeydown="if(event.key==='Enter'||event.keyCode===13){event.preventDefault();aplicarDescuentoItemMob('${i.id}');this.blur();}"
+            style="flex:1;padding:8px 6px;border:1.5px solid #f9a8d4;border-radius:6px;font-size:16px;font-weight:700;color:#be185d;text-align:center">
+          <span style="font-size:13px;color:#9d174d;font-weight:700">%</span>
+          <button onclick="aplicarDescuentoItemMob('${i.id}')"
+            style="background:linear-gradient(135deg,#be185d,#9d174d);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:14px;font-weight:800;cursor:pointer;touch-action:manipulation;white-space:nowrap">
+            ✓ Aplicar
+          </button>
+        </div>
+        ${desc > 0 ? `<span style="font-size:11px;color:#16a34a;font-weight:700;white-space:nowrap">-$${(i.sellPrice * (desc/100) * i.qty).toFixed(2)}</span>` : ''}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
+
+function setDescuentoItemMob(id, val) {
+  const item = cart.find(i => i.id === id);
+  if (item) {
+    item.descuento = Math.min(100, Math.max(0, parseFloat(val) || 0));
+    updateCartUI();
+  }
+}
+
+function aplicarDescuentoItemMob(id) {
+  const input = document.getElementById('desc_' + id);
+  if (!input) return;
+  const val = parseFloat(input.value) || 0;
+  const item = cart.find(i => i.id === id);
+  if (item) {
+    item.descuento = Math.min(100, Math.max(0, val));
+    input.blur(); // cerrar teclado
+    updateCartUI();
+    toast(`🏷️ Descuento ${item.descuento}% aplicado`, 'info');
+  }
+}
+
+function abrirDescuentoNota() {
+  const subtotal = cart.reduce((s, i) => s + i.sellPrice * (1 - (i.descuento||0)/100) * i.qty, 0);
+  document.getElementById('descModalSubtotal').textContent = '$' + subtotal.toFixed(2);
+  document.getElementById('descModalInput').value = '';
+  document.getElementById('descModalResult').textContent = '';
+  document.getElementById('descModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('descModalInput').focus(), 100);
+}
+function descModalCalc() {
+  const subtotal = cart.reduce((s, i) => s + i.sellPrice * (1 - (i.descuento||0)/100) * i.qty, 0);
+  const tipo = document.querySelector('input[name="descTipo"]:checked').value;
+  const val = parseFloat(document.getElementById('descModalInput').value) || 0;
+  const descPesos = tipo === 'pct' ? subtotal * Math.min(100,val)/100 : Math.min(subtotal, val);
+  const res = document.getElementById('descModalResult');
+  res.textContent = val > 0 ? 'Descuento: -$' + descPesos.toFixed(2) + '  ->  Total: $' + (subtotal-descPesos).toFixed(2) : '';
+}
+function descModalAplicar() {
+  const subtotal = cart.reduce((s, i) => s + i.sellPrice * (1 - (i.descuento||0)/100) * i.qty, 0);
+  const tipo = document.querySelector('input[name="descTipo"]:checked').value;
+  const val = parseFloat(document.getElementById('descModalInput').value) || 0;
+  _descuentoNota = tipo === 'pct' ? subtotal * Math.min(100,val)/100 : Math.min(subtotal, val);
+  document.getElementById('descModal').style.display = 'none';
+  updateCartUI(); toast('Descuento aplicado');
+}
+function descModalQuitar() {
+  _descuentoNota = 0;
+  document.getElementById('descModal').style.display = 'none';
+  updateCartUI();
+}
+function descModalCerrar() { document.getElementById('descModal').style.display = 'none'; }
 
 function changeQtyMobile(id, delta) {
   const item = cart.find(i => i.id === id);
@@ -873,6 +1092,87 @@ function changeQtyMobile(id, delta) {
   else if (newQty > item.stock) { toast('Sin más stock', 'error'); return; }
   else { item.qty = newQty; }
   updateCartUI();
+}
+
+function enviarNotaContactoExistente() {
+  if (!cart.length) { toast('El carrito está vacío', 'error'); return; }
+  const customer = document.getElementById('ventaCliente').value.trim() || 'Cliente';
+
+  const subtotal = cart.reduce((s, i) => {
+    const desc = i.descuento || 0;
+    return s + i.sellPrice * (1 - desc/100) * i.qty;
+  }, 0);
+  const total = Math.max(0, subtotal - (_descuentoNota || 0));
+
+  const lineas = cart.map(i => {
+    const desc = i.descuento || 0;
+    const precio = i.sellPrice * (1 - desc/100);
+    return `• ${i.name} ×${i.qty} — $${(precio * i.qty).toFixed(2)}`;
+  }).join('\n');
+
+  const msg = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*
+📅 ${new Date().toLocaleDateString('es-MX')}
+👤 *Cliente: ${customer}*
+
+${lineas}
+
+━━━━━━━━━━━━━
+💰 *TOTAL: $${total.toFixed(2)}*
+━━━━━━━━━━━━━
+${cfg.msg || '¡Gracias por su compra!'}`;
+
+  const profit2 = cart.reduce((s, i) => {
+    const desc = i.descuento || 0;
+    return s + (i.sellPrice*(1-desc/100) - (i.buyPrice||0)) * i.qty;
+  }, 0) - (_descuentoNota||0);
+  sales.push({ id: Date.now().toString(), date: new Date().toISOString(), customer,
+    items: cart.map(i=>({...i})), total, profit: profit2, inCut: false });
+  saveData();
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+  cart = []; _descuentoNota = 0;
+  document.getElementById('ventaCliente').value = '';
+  updateCartUI(); renderNotas();
+  toast('Nota guardada');
+}
+
+function mandarPorWhatsApp() {
+  if (!cart.length) { toast('El carrito esta vacio', 'error'); return; }
+  var customer = document.getElementById('ventaCliente').value.trim() || 'Cliente';
+  var subtotal = cart.reduce(function(s, i) {
+    var d = i.descuento || 0;
+    return s + i.sellPrice * (1 - d/100) * i.qty;
+  }, 0);
+  var total = Math.max(0, subtotal - (_descuentoNota || 0));
+  var NL = String.fromCharCode(10);
+  var lineas = cart.map(function(i) {
+    var d = i.descuento || 0;
+    var p = i.sellPrice * (1 - d/100);
+    return '* ' + i.name + ' x' + i.qty + ' - $' + (p * i.qty).toFixed(2);
+  }).join(NL);
+  var sep = '=============';
+  var msg = (cfg.bizName || 'MI NEGOCIO') + NL
+    + new Date().toLocaleDateString('es-MX') + NL
+    + 'Cliente: ' + customer + NL + NL
+    + lineas + NL + NL
+    + sep + NL
+    + 'TOTAL: $' + total.toFixed(2) + NL
+    + sep + NL
+    + (cfg.msg || 'Gracias por su compra!');
+  var profit = cart.reduce(function(s, i) {
+    var d = i.descuento || 0;
+    return s + (i.sellPrice*(1-d/100) - (i.buyPrice||0)) * i.qty;
+  }, 0) - (_descuentoNota||0);
+  sales.push({ id: Date.now().toString(), date: new Date().toISOString(),
+    customer: customer, items: cart.map(function(i){return Object.assign({},i);}),
+    total: total, profit: profit, inCut: false });
+  saveData();
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+  cart = [];
+  _descuentoNota = 0;
+  document.getElementById('ventaCliente').value = '';
+  updateCartUI();
+  renderNotas();
+  toast('Nota guardada');
 }
 
 function waNumNuevoMobEnviar() {
@@ -910,6 +1210,7 @@ function waNumNuevoMobEnviar() {
 
   // Limpiar carrito
   cart = [];
+  _descuentoNota = 0;
   document.getElementById('ventaCliente').value = '';
   updateCartUI();
   renderInventario();
@@ -956,6 +1257,7 @@ async function completarVenta() {
   const msg = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date(sale.date).toLocaleDateString('es-MX')}\n👤 *Cliente: ${sale.customer}*\n\n${lineas}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${sale.total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
 
   cart = [];
+  _descuentoNota = 0;
   document.getElementById('ventaCliente').value = '';
   updateCartUI();
   renderInventario();
@@ -1036,58 +1338,95 @@ function generarPDFNota(saleId) {
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'mm', format:'letter', orientation:'portrait' });
-  const W = 216, PL = 20, PR = 20;
-  let y = 20;
-  const ln = (h=5) => { y += h; };
+  const W = 216, PL = 18, PR = 18;
+  let y = 14;
+  const ln = (h) => { y += h; };
+  const fmt = v => '$' + (v||0).toFixed(2);
 
-  // Encabezado
-  doc.setFontSize(22); doc.setFont('helvetica','bold');
-  doc.text(cfg.bizName || 'MI NEGOCIO', W/2, y, {align:'center'}); ln(8);
-  doc.setFontSize(10); doc.setFont('helvetica','normal');
-  if (cfg.address) { doc.text(cfg.address, W/2, y, {align:'center'}); ln(5); }
-  if (cfg.phone)   { doc.text('Tel: ' + cfg.phone, W/2, y, {align:'center'}); ln(5); }
-  ln(2); doc.setLineWidth(0.4); doc.line(PL, y, W-PR, y); ln(6);
+  // Config tamaños (usa mismos cfg que PC)
+  const nameSize  = cfg.headerNameSize  || 20;
+  const dataSize  = cfg.headerDataSize  || 9;
+  const bodySize  = cfg.ticketBodySize  || 10;
+  const lineH     = cfg.ticketLineH     || 5.5;
+  const nameBold  = cfg.headerNameBold  !== false;
+  const nameItal  = cfg.headerNameItalic === true;
+  const jsPdfFont = nameBold && nameItal ? 'bolditalic' : nameBold ? 'bold' : nameItal ? 'italic' : 'normal';
 
-  // Datos
+  // ── ENCABEZADO: Logo IZQUIERDA + Datos DERECHA ──
+  const logoSize = 26;
+  const logoX = PL;
+  const dataX = PL + logoSize + 5;
+  const yStart = y;
+
+  if (cfg.headerLogo) {
+    try { doc.addImage(cfg.headerLogo, 'JPEG', logoX, y, logoSize, logoSize); } catch {}
+  }
+
+  doc.setFontSize(nameSize); doc.setFont('helvetica', jsPdfFont);
+  doc.text(cfg.bizName || 'MI NEGOCIO', dataX, y + 7);
+  let yData = y + 7 + nameSize * 0.38;
+
+  doc.setFontSize(dataSize); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+  if (cfg.address) { doc.text(cfg.address, dataX, yData); yData += dataSize * 0.55; }
+  if (cfg.phone)   { doc.text('Tel: ' + cfg.phone, dataX, yData); yData += dataSize * 0.55; }
+  if (cfg.rfc)     { doc.text('RFC: ' + cfg.rfc, dataX, yData); yData += dataSize * 0.55; }
+  doc.setTextColor(0,0,0);
+
+  y = Math.max(yStart + logoSize + 3, yData + 2);
+  doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(4);
+
+  // ── Datos de la venta ──
   const d = new Date(sale.date);
-  doc.setFontSize(10);
-  doc.text(`Fecha: ${d.toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}`, PL, y); ln(5);
-  doc.text(`Hora:  ${d.toLocaleTimeString('es-MX')}`, PL, y); ln(5);
-  doc.text(`Folio: #${sale.id.slice(-8).toUpperCase()}`, PL, y); ln(5);
-  doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text(`Cliente: ${sale.customer}`, PL, y); ln(7);
-  doc.setFont('helvetica','normal');
-  doc.setLineWidth(0.4); doc.line(PL, y, W-PR, y); ln(6);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  const fechaStr = d.toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  doc.text(`Fecha: ${fechaStr}`, PL, y);
+  doc.text(`Hora: ${d.toLocaleTimeString('es-MX')}`, W-PR, y, {align:'right'}); ln(4.5);
+  doc.text(`Folio: #${sale.id.slice(-8).toUpperCase()}`, PL, y);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text(`Cliente: ${sale.customer}`, W-PR, y, {align:'right'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); ln(4);
+  doc.setLineWidth(0.3); doc.line(PL, y, W-PR, y); ln(4);
 
-  // Tabla
-  doc.setFontSize(10); doc.setFont('helvetica','bold');
+  // ── Encabezado tabla ──
+  doc.setFontSize(bodySize); doc.setFont('helvetica','bold');
   doc.text('PRODUCTO', PL, y);
-  doc.text('CANT',   PL+95, y, {align:'center'});
-  doc.text('P.UNIT.', PL+125, y, {align:'center'});
+  doc.text('CANT',    PL+98, y, {align:'center'});
+  doc.text('P.UNIT.', PL+128, y, {align:'center'});
   doc.text('SUBTOTAL', W-PR, y, {align:'right'});
-  ln(4); doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(5);
+  ln(3); doc.setLineWidth(0.5); doc.line(PL, y, W-PR, y); ln(lineH);
 
-  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  // ── Filas de productos ──
+  doc.setFont('helvetica','normal'); doc.setFontSize(bodySize);
   sale.items.forEach(item => {
-    const name = item.name.length > 40 ? item.name.slice(0,40)+'…' : item.name;
-    doc.text(name, PL, y);
-    doc.text(String(item.qty), PL+95, y, {align:'center'});
-    doc.text(`$${item.sellPrice.toFixed(2)}`, PL+125, y, {align:'center'});
-    doc.text(`$${(item.sellPrice*item.qty).toFixed(2)}`, W-PR, y, {align:'right'});
-    ln(7);
+    const maxChars = Math.floor(85 / (bodySize * 0.42));
+    const name = item.name.length > maxChars ? item.name.slice(0, maxChars)+'…' : item.name;
+    doc.text(name,                           PL,      y);
+    doc.text(String(item.qty),               PL+98,   y, {align:'center'});
+    doc.text(fmt(item.sellPrice),            PL+128,  y, {align:'center'});
+    doc.setFont('helvetica','bold');
+    doc.text(fmt(item.sellPrice * item.qty), W-PR,    y, {align:'right'});
+    doc.setFont('helvetica','normal');
+    ln(lineH);
   });
 
   doc.setLineWidth(0.3); doc.line(PL, y, W-PR, y); ln(5);
-  doc.setFontSize(11); doc.setFont('helvetica','normal');
-  doc.text('Subtotal:', W-PR-65, y);
-  doc.text(`$${sale.total.toFixed(2)}`, W-PR, y, {align:'right'}); ln(7);
-  doc.setLineWidth(0.5); doc.line(W-PR-80, y, W-PR, y); ln(4);
+
+  // ── Totales ──
+  doc.setFontSize(10); doc.setFont('helvetica','normal');
+  doc.text('Subtotal:', W-PR-60, y);
+  doc.text(fmt(sale.total), W-PR, y, {align:'right'}); ln(4);
+  doc.text(`No. artículos: ${sale.items.reduce((a,i)=>a+i.qty,0)}`, PL, y);
+  doc.setLineWidth(0.7); doc.line(W-PR-85, y, W-PR, y); ln(5);
   doc.setFontSize(15); doc.setFont('helvetica','bold');
   doc.text('TOTAL A PAGAR:', W-PR-85, y);
-  doc.text(`$${sale.total.toFixed(2)}`, W-PR, y, {align:'right'}); ln(12);
+  doc.text(fmt(sale.total), W-PR, y, {align:'right'}); ln(10);
 
-  doc.setFont('helvetica','italic'); doc.setFontSize(11);
-  doc.text(cfg.msg || '¡Gracias por su compra! Vuelva pronto 😊', W/2, y, {align:'center'});
+  // ── Pie de página ──
+  doc.setDrawColor(200,200,200); doc.setLineWidth(0.3); doc.line(PL, y, W-PR, y); ln(5);
+  doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(60,60,60);
+  doc.text(cfg.msg || '¡Gracias por su compra! Vuelva pronto 😊', W/2, y, {align:'center'}); ln(5);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(150,150,150);
+  doc.text('Comprobante de venta — ' + (cfg.bizName || 'MI NEGOCIO'), W/2, y, {align:'center'});
 
   doc.save(`ticket_${sale.customer.replace(/\s+/g,'_')}_${sale.id.slice(-6)}.pdf`);
   toast('📄 PDF descargado');
@@ -1584,6 +1923,47 @@ function editarProducto(id) {
   calcMargen();
   window.scrollTo({ top: 0, behavior: 'smooth' });
   toast('✏️ Editando: ' + p.name, 'info');
+}
+
+// ─── ZONA DE PELIGRO ──────────────────────────────────────────────────────────
+function toggleZonaPeligro() {
+  const panel = document.getElementById('zonaPeligroPanel');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+}
+
+function borrarSoloNotas() {
+  if (!confirm('¿Borrar todo el historial de notas y ventas?\n\nEsto NO borra el inventario.')) return;
+  if (!confirm('⚠️ Segunda confirmación:\n¿Estás SEGURA? Las notas no se pueden recuperar.')) return;
+  sales = []; cuts = [];
+  saveData();
+  renderNotas();
+  toast('🗒️ Historial borrado', 'info');
+  toggleZonaPeligro();
+}
+
+function borrarSoloInventario() {
+  if (!confirm('¿Borrar todo el inventario de productos?\n\nEsto NO borra las notas.')) return;
+  if (!confirm('⚠️ Segunda confirmación:\n¿Estás SEGURA? Los productos no se pueden recuperar.')) return;
+  products = [];
+  saveData();
+  renderInventario();
+  renderUltimosProductos();
+  toast('📦 Inventario borrado', 'info');
+  toggleZonaPeligro();
+}
+
+function borrarTodoMovil() {
+  if (!confirm('💣 ¿Borrar TODO?\n\nSe eliminarán productos, notas, ventas y cortes.\n\nEsta acción NO se puede deshacer.')) return;
+  if (!confirm('⚠️ ÚLTIMA ADVERTENCIA:\n¿Estás completamente segura?\n\nTodo quedará en cero.')) return;
+  products = []; sales = []; cuts = [];
+  try { localStorage.removeItem('naye_pos_backup'); } catch {}
+  if (typeof fbDoc !== 'undefined' && fbDoc) fbDoc.set({ products: [], sales: [], cuts: [], cfg }).catch(() => {});
+  renderInventario();
+  renderNotas();
+  renderUltimosProductos();
+  toast('✅ Todo borrado. Empezando desde cero.', 'info');
+  toggleZonaPeligro();
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
