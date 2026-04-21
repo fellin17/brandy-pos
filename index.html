@@ -13,6 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>/* QRCode - embebido sin internet */
 var QRCode=(function(){'use strict';var QRMode={MODE_8BIT_BYTE:4},QRErrorCorrectLevel={M:0,L:1,H:2,Q:3};var QRUtil={PATTERN_POSITION_TABLE:[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],G15:(1<<10)|(1<<8)|(1<<5)|(1<<4)|(1<<2)|(1<<1)|(1<<0),G18:(1<<12)|(1<<11)|(1<<10)|(1<<9)|(1<<8)|(1<<5)|(1<<2)|(1<<0),G15_MASK:(1<<14)|(1<<12)|(1<<10)|(1<<4)|(1<<1),getBCHTypeInfo:function(d){var a=d<<10;while(QRUtil.getBCHDigit(a)-QRUtil.getBCHDigit(QRUtil.G15)>=0){a^=(QRUtil.G15<<(QRUtil.getBCHDigit(a)-QRUtil.getBCHDigit(QRUtil.G15)))}return((d<<10)|a)^QRUtil.G15_MASK},getBCHTypeNumber:function(d){var a=d<<12;while(QRUtil.getBCHDigit(a)-QRUtil.getBCHDigit(QRUtil.G18)>=0){a^=(QRUtil.G18<<(QRUtil.getBCHDigit(a)-QRUtil.getBCHDigit(QRUtil.G18)))}return(d<<12)|a},getBCHDigit:function(d){var a=0;while(d!=0){a++;d>>>=1}return a},getPatternPosition:function(t){return QRUtil.PATTERN_POSITION_TABLE[t-1]},getMaskFunction:function(p){switch(p){case 0:return function(i,j){return(i+j)%2==0};case 1:return function(i,j){return i%2==0};case 2:return function(i,j){return j%3==0};case 3:return function(i,j){return(i+j)%3==0};case 4:return function(i,j){return(Math.floor(i/2)+Math.floor(j/3))%2==0};case 5:return function(i,j){return(i*j)%2+(i*j)%3==0};case 6:return function(i,j){return((i*j)%2+(i*j)%3)%2==0};case 7:return function(i,j){return((i*j)%3+(i+j)%2)%2==0};default:throw new Error("bad mask:"+p)}},getErrorCorrectPolynomial:function(e){var a=new QRPolynomial([1],0);for(var i=0;i<e;i++){a=a.multiply(new QRPolynomial([1,QRMath.gexp(i)],0))}return a},getLostPoint:function(q){var mc=q.getModuleCount(),lp=0,row,col;for(row=0;row<mc;row++){for(col=0;col<mc;col++){var sc=0,r,c;for(r=-1;r<=1;r++){if(row+r<0||mc<=row+r)continue;for(c=-1;c<=1;c++){if(col+c<0||mc<=col+c)continue;if(r==0&&c==0)continue;if(q.isDark(row+r,col+c))sc++}}if(sc<=0||sc>=5){lp+=(sc==0||sc==5)?3:sc-2}}}for(row=0;row<mc-1;row++){for(col=0;col<mc-1;col++){var ct=0;if(q.isDark(row,col))ct++;if(q.isDark(row+1,col))ct++;if(q.isDark(row,col+1))ct++;if(q.isDark(row+1,col+1))ct++;if(ct==0||ct==4)lp+=3}}for(row=0;row<mc;row++){for(col=0;col<mc-6;col++){if(q.isDark(row,col)&&!q.isDark(row,col+1)&&q.isDark(row,col+2)&&q.isDark(row,col+3)&&q.isDark(row,col+4)&&!q.isDark(row,col+5)&&q.isDark(row,col+6)){lp+=40}}}for(col=0;col<mc;col++){for(row=0;row<mc-6;row++){if(q.isDark(row,col)&&!q.isDark(row+1,col)&&q.isDark(row+2,col)&&q.isDark(row+3,col)&&q.isDark(row+4,col)&&!q.isDark(row+5,col)&&q.isDark(row+6,col)){lp+=40}}}var dk=0;for(row=0;row<mc;row++){for(col=0;col<mc;col++){if(q.isDark(row,col))dk++}}var ra=Math.abs(100*dk/mc/mc-50)/5;lp+=ra*10;return lp}};
 var QRMath={glog:function(n){if(n<1)throw new Error("glog("+n+")");return QRMath.LOG_TABLE[n]},gexp:function(n){while(n<0)n+=255;while(n>=256)n-=255;return QRMath.EXP_TABLE[n]},EXP_TABLE:new Array(256),LOG_TABLE:new Array(256)};
@@ -375,6 +376,46 @@ return QRCode;
           <div style="font-weight:700;font-size:16px">📋 Historial de Ventas</div>
           <span id="histCount" class="tag tag-blue"></span>
         </div>
+        <button onclick="toggleReportePC()" style="padding:10px 18px;background:linear-gradient(135deg,#1d4ed8,#7c3aed);color:white;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px">
+          📊 Reportes de Ventas
+        </button>
+      </div>
+
+      <!-- Panel de Reportes -->
+      <div id="reportePCPanel" style="display:none;margin-bottom:16px">
+        <div class="card">
+          <!-- Selector de tipo de reporte -->
+          <div id="reportePCMenu" style="padding:14px;display:flex;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--border)">
+            <button onclick="generarReportePC('semanal')" style="flex:1;min-width:180px;padding:14px;background:#eff6ff;border:1.5px solid #1d4ed8;border-radius:10px;color:#1d4ed8;font-weight:700;font-size:13px;cursor:pointer;text-align:left">
+              📅 <strong>Reporte Semanal</strong><br><span style="font-size:11px;font-weight:400;opacity:.8">Ventas de los últimos 7 días</span>
+            </button>
+            <button onclick="generarReportePC('mensual')" style="flex:1;min-width:180px;padding:14px;background:#f0fdf4;border:1.5px solid #16a34a;border-radius:10px;color:#16a34a;font-weight:700;font-size:13px;cursor:pointer;text-align:left">
+              📆 <strong>Reporte Mensual</strong><br><span style="font-size:11px;font-weight:400;opacity:.8">Comparativa de meses</span>
+            </button>
+            <button onclick="generarReportePC('anual')" style="flex:1;min-width:180px;padding:14px;background:#fdf4ff;border:1.5px solid #7c3aed;border-radius:10px;color:#7c3aed;font-weight:700;font-size:13px;cursor:pointer;text-align:left">
+              📈 <strong>Reporte Anual</strong><br><span style="font-size:11px;font-weight:400;opacity:.8">Comparativa anual</span>
+            </button>
+          </div>
+
+          <!-- Contenido del reporte generado -->
+          <div id="reportePCContent" style="display:none">
+            <div style="padding:14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">
+              <div id="reportePCTitulo" style="font-weight:800;font-size:15px;color:var(--accent)"></div>
+              <div style="display:flex;gap:8px">
+                <button onclick="reportePCPDF()" class="btn btn-primary btn-sm">📄 Imprimir / PDF</button>
+                <button onclick="cerrarReportePC()" class="btn btn-ghost btn-sm">✕ Cerrar</button>
+              </div>
+            </div>
+            <div id="reportePCStats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:16px"></div>
+            <div style="padding:0 16px 16px">
+              <canvas id="chartPC" height="300"></canvas>
+            </div>
+            <div id="reportePCTop10" style="display:none;border-top:1px solid var(--border)">
+              <div style="padding:12px 16px;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase">🏆 Top 10 productos más vendidos del período</div>
+              <div id="top10PCReport"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Filtro por cliente -->
@@ -715,6 +756,26 @@ return QRCode;
 </div>
 
 <!-- ═══════════ TOAST ═══════════ -->
+<!-- ═══════════ MODAL: VENTA COMPLETADA ═══════════ -->
+<div class="modal-bg" id="modalSaleCompleted">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header" style="background:var(--green);color:white;border:none">
+      <h3>✅ ¡Venta Completada!</h3>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:30px 20px">
+      <div style="font-size:48px;margin-bottom:12px">🎉</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;font-weight:700;letter-spacing:.04em">Cliente</div>
+      <div id="saleCompletedCustomer" style="font-size:22px;font-weight:800;color:var(--text);margin-bottom:20px"></div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;font-weight:700;letter-spacing:.04em">Total de la venta</div>
+      <div id="saleCompletedTotal" style="font-size:42px;font-weight:900;color:var(--green);font-family:monospace;margin-bottom:24px"></div>
+      <div style="background:var(--green-light);border-radius:8px;padding:12px;margin-bottom:20px">
+        <div style="font-size:12px;color:var(--green);font-weight:700">📄 PDF del ticket descargado correctamente</div>
+      </div>
+      <button class="btn btn-success btn-block" onclick="closeSaleCompletedModal()">Aceptar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ MODAL: EDITAR NOTA ═══════════ -->
 <div class="modal-bg" id="modalEditNota">
   <div class="modal" style="max-width:600px">
@@ -820,6 +881,7 @@ let cfg = {
   headerAlign:'center',  // alineación: center, left, right
 };
 let cart = [], editProdId = null;
+let cartDiscount = 0; // porcentaje de descuento (0-100)
 
 function saveAll() { DB.save({ products, sales, cuts, cfg }); }
 
@@ -1072,11 +1134,15 @@ function updateCartUI() {
   if (!cart.length) {
     wrap.innerHTML = '<div class="empty"><div class="icon">🛒</div><div>Busca y agrega productos</div></div>';
     summary.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">Agrega productos para ver el total</div>';
+    cartDiscount = 0;
     return;
   }
 
   const subtotal = cart.reduce((s, i) => s + i.sellPrice * i.qty, 0);
-  const profit   = cart.reduce((s, i) => s + (i.sellPrice - i.buyPrice) * i.qty, 0);
+  const descuentoMonto = subtotal * (cartDiscount / 100);
+  const totalFinal = subtotal - descuentoMonto;
+  const profitBase = cart.reduce((s, i) => s + (i.sellPrice - i.buyPrice) * i.qty, 0);
+  const profit = profitBase - descuentoMonto;
 
   // Tabla
   wrap.innerHTML = `
@@ -1110,14 +1176,44 @@ function updateCartUI() {
       </tbody>
     </table>`;
 
-  // Resumen lateral
+  // Resumen lateral con descuento
   summary.innerHTML = `
     <div class="cart-total-row"><span>Artículos:</span><span>${cart.reduce((s,i)=>s+i.qty,0)}</span></div>
     <div class="cart-total-row"><span>Subtotal:</span><span>${fmt(subtotal)}</span></div>
-    <div class="cart-total-row grand"><span>TOTAL:</span><span style="color:var(--accent)">${fmt(subtotal)}</span></div>
+
+    <!-- Control de descuento -->
+    <div style="margin:10px 0;border:1.5px solid #7c3aed;border-radius:8px;padding:10px;background:#faf5ff">
+      <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;gap:6px">🏷️ Descuento</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${[5,10,15,20].map(p => `
+          <button onclick="setDiscount(${p})" style="padding:6px 10px;border:1.5px solid ${cartDiscount===p?'#7c3aed':'var(--border)'};background:${cartDiscount===p?'#7c3aed':'white'};color:${cartDiscount===p?'white':'var(--text)'};border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;transition:all .15s">${p}%</button>
+        `).join('')}
+        <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:80px">
+          <input type="number" id="customDiscount" value="${cartDiscount}" min="0" max="100" step="1"
+            onchange="setDiscount(parseInt(this.value)||0)"
+            style="width:52px;padding:6px 4px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;text-align:center;font-weight:700">
+          <span style="font-size:12px;font-weight:700;color:var(--muted)">%</span>
+        </div>
+        ${cartDiscount > 0 ? `<button onclick="setDiscount(0)" style="padding:6px 8px;border:none;background:var(--red-light);color:var(--red);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">✕ Quitar</button>` : ''}
+      </div>
+    </div>
+
+    ${cartDiscount > 0 ? `
+      <div class="cart-total-row" style="color:var(--red)">
+        <span>Descuento (${cartDiscount}%):</span>
+        <span>-${fmt(descuentoMonto)}</span>
+      </div>
+    ` : ''}
+    <div class="cart-total-row grand"><span>TOTAL:</span><span style="color:var(--accent)">${fmt(totalFinal)}</span></div>
     <div style="margin-top:8px;background:var(--green-light);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--green);font-weight:700">
       💰 Ganancia estimada: ${fmt(profit)}
     </div>`;
+}
+
+// ─── DESCUENTO ────────────────────────────────────────────────────────────────
+function setDiscount(pct) {
+  cartDiscount = Math.max(0, Math.min(100, parseInt(pct) || 0));
+  updateCartUI();
 }
 
 // ─── COMPLETE SALE ─────────────────────────────────────────────────────────────
@@ -1130,7 +1226,7 @@ function completeSale() {
   if (!sale) return;
 
   generateTicketPDF(sale);
-  toast('¡Venta completada! PDF descargado 🎉');
+  showSaleCompletedModal(sale);
   clearCartUI();
   renderInventory();
 }
@@ -1138,6 +1234,7 @@ function completeSale() {
 // ─── LABEL ────────────────────────────────────────────────────────────────────
 function clearCartUI() {
   cart = [];
+  cartDiscount = 0;
   window._currentSaleId = null;
   document.getElementById('posCustomer').value = '';
   updateCartUI();
@@ -1345,10 +1442,23 @@ function generateTicketPDF(sale) {
 
   doc.setLineWidth(0.3); doc.line(PL, y, W-PR, y); ln(7);
 
-  // Totales
+  // Totales con descuento
+  const saleSubtotal = sale.subtotal || sale.total;
+  const saleDiscount = sale.discount || 0;
+  const saleDiscountAmount = sale.discountAmount || 0;
+
   doc.setFontSize(11); doc.setFont('helvetica','normal');
   doc.text('Subtotal:', W-PR-65, y);
-  doc.text(fmt(sale.total), W-PR, y, {align:'right'}); ln(9);
+  doc.text(fmt(saleSubtotal), W-PR, y, {align:'right'}); ln(6);
+
+  if (saleDiscount > 0) {
+    doc.setTextColor(220,38,38);
+    doc.text(`Descuento (${saleDiscount}%):`, W-PR-65, y);
+    doc.text(`-${fmt(saleDiscountAmount)}`, W-PR, y, {align:'right'}); ln(6);
+    doc.setTextColor(0,0,0);
+  }
+
+  ln(3);
   doc.setLineWidth(0.6); doc.line(W-PR-90, y, W-PR, y); ln(7);
   doc.setFontSize(16); doc.setFont('helvetica','bold');
   doc.text('TOTAL A PAGAR:', W-PR-90, y);
@@ -1388,8 +1498,11 @@ function saveSaleFromCart() {
     return sales.find(s => s.id === window._currentSaleId) || null;
   }
 
-  const total  = cart.reduce((s, i) => s + i.sellPrice * i.qty, 0);
-  const profit = cart.reduce((s, i) => s + (i.sellPrice - i.buyPrice) * i.qty, 0);
+  const subtotal = cart.reduce((s, i) => s + i.sellPrice * i.qty, 0);
+  const descuentoMonto = subtotal * (cartDiscount / 100);
+  const total  = subtotal - descuentoMonto;
+  const profitBase = cart.reduce((s, i) => s + (i.sellPrice - i.buyPrice) * i.qty, 0);
+  const profit = profitBase - descuentoMonto;
 
   const sale = {
     id: Date.now().toString(),
@@ -1397,6 +1510,9 @@ function saveSaleFromCart() {
     customer,
     items: cart.map(i => ({ ...i })),
     total, profit, inCut: false,
+    discount: cartDiscount,       // porcentaje
+    discountAmount: descuentoMonto, // monto
+    subtotal: subtotal,           // subtotal antes de descuento
   };
 
   // Descontar stock
@@ -1441,7 +1557,8 @@ function waNumeroNuevoEnviar() {
 
   // Construir mensaje
   const lineas = sale.items.map(i => `• ${i.name} x${i.qty} — $${(i.sellPrice*i.qty).toFixed(2)}`).join('\n');
-  const msg = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date(sale.date).toLocaleDateString('es-MX')}\n👤 *${sale.customer}*\n\n${lineas}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${sale.total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
+  const descLine = (sale.discount && sale.discount > 0) ? `\n🏷️ Descuento: ${sale.discount}% (-$${(sale.discountAmount||0).toFixed(2)})` : '';
+  const msg = `🏪 *${cfg.bizName || 'MI NEGOCIO'}*\n📅 ${new Date(sale.date).toLocaleDateString('es-MX')}\n👤 *${sale.customer}*\n\n${lineas}${descLine}\n\n━━━━━━━━━━━━━\n💰 *TOTAL: $${sale.total.toFixed(2)}*\n━━━━━━━━━━━━━\n${cfg.msg || '¡Gracias por su compra!'}`;
 
   // Abrir directo la app de WhatsApp
   window.location.href = `whatsapp://send?phone=52${num}&text=${encodeURIComponent(msg)}`;
@@ -1471,13 +1588,17 @@ function shareLastWhatsApp() {
     `• ${i.name} ×${i.qty} — ${fmt(i.sellPrice * i.qty)}`
   ).join('\n');
 
+  const descLine = (sale.discount && sale.discount > 0)
+    ? `\n🏷️ Descuento: ${sale.discount}% (-${fmt(sale.discountAmount || 0)})`
+    : '';
+
   const msg =
 `🏪 *${cfg.bizName || 'MI NEGOCIO'}*
 📅 ${new Date(sale.date).toLocaleDateString('es-MX')} ${new Date(sale.date).toLocaleTimeString('es-MX')}
 👤 *Cliente: ${sale.customer}*
 
 ${lineas}
-
+${descLine}
 ━━━━━━━━━━━━━
 💰 *TOTAL: ${fmt(sale.total)}*
 ━━━━━━━━━━━━━
@@ -1494,13 +1615,17 @@ function shareWhatsApp(sale) {
     `• ${i.name} ×${i.qty} — ${fmt(i.sellPrice * i.qty)}`
   ).join('\n');
 
+  const descLine = (sale.discount && sale.discount > 0)
+    ? `\n🏷️ Descuento: ${sale.discount}% (-${fmt(sale.discountAmount || 0)})`
+    : '';
+
   const msg =
 `🏪 *${cfg.bizName || 'MI NEGOCIO'}*
 📅 ${d.toLocaleDateString('es-MX')} ${d.toLocaleTimeString('es-MX')}
 👤 *Cliente: ${sale.customer}*
 
 ${lineas}
-
+${descLine}
 ━━━━━━━━━━━━━
 💰 *TOTAL: ${fmt(sale.total)}*
 ━━━━━━━━━━━━━
@@ -1680,13 +1805,17 @@ function renderHistory() {
     return;
   }
 
-  list.innerHTML = [...filtered].reverse().map(s => `
+  list.innerHTML = [...filtered].reverse().map(s => {
+    const showDiscount = s.discount && s.discount > 0;
+    const saleSubtotal = s.subtotal || s.total;
+    return `
     <div class="card" style="margin-bottom:10px">
       <div style="padding:12px 16px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <div>
             <strong style="font-size:15px">${s.customer}</strong>
-            <span class="tag ${s.inCut ? 'tag-blue' : 'tag-green'}" style="margin-left:8px">${s.inCut ? 'En corte' : 'Completada'}</span><br>
+            <span class="tag ${s.inCut ? 'tag-blue' : 'tag-green'}" style="margin-left:8px">${s.inCut ? 'En corte' : 'Completada'}</span>
+            ${showDiscount ? `<span class="tag" style="background:#fdf4ff;color:#7c3aed;margin-left:4px">🏷️ -${s.discount}%</span>` : ''}<br>
             <span style="font-size:11px;color:var(--muted)">${new Date(s.date).toLocaleString('es-MX')} · #${s.id.slice(-6).toUpperCase()}</span>
           </div>
           <div style="text-align:right">
@@ -1703,6 +1832,18 @@ function renderHistory() {
               <td style="text-align:right">${fmt(i.sellPrice)}</td>
               <td style="text-align:right;font-weight:700">${fmt(i.sellPrice*i.qty)}</td>
             </tr>`).join('')}
+            ${showDiscount ? `<tr style="border-top:1px solid var(--border)">
+              <td colspan="3" style="text-align:right;padding-top:6px"><strong>Subtotal:</strong></td>
+              <td style="text-align:right;font-weight:700;padding-top:6px">${fmt(saleSubtotal)}</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="text-align:right;color:var(--red)"><strong>Descuento (${s.discount}%):</strong></td>
+              <td style="text-align:right;font-weight:700;color:var(--red)">-${fmt(s.discountAmount || 0)}</td>
+            </tr>
+            <tr style="border-top:2px solid var(--border)">
+              <td colspan="3" style="text-align:right;padding-top:6px"><strong style="font-size:14px">TOTAL:</strong></td>
+              <td style="text-align:right;font-weight:800;color:var(--accent);font-size:14px;padding-top:6px">${fmt(s.total)}</td>
+            </tr>` : ''}
           </tbody>
         </table>
         <div style="display:flex;gap:12px;align-items:flex-start;margin-top:10px">
@@ -1721,7 +1862,8 @@ function renderHistory() {
           </div>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   // Generar QRs después de que el DOM esté listo
   setTimeout(renderQRCodes, 50);
@@ -2136,6 +2278,263 @@ function deleteProduct(id) {
   saveAll();
   renderInventory();
   toast('Producto eliminado');
+}
+
+// ─── MODAL VENTA COMPLETADA ───────────────────────────────────────────────────
+function showSaleCompletedModal(sale) {
+  document.getElementById('saleCompletedCustomer').textContent = sale.customer;
+  document.getElementById('saleCompletedTotal').textContent = fmt(sale.total);
+  document.getElementById('modalSaleCompleted').classList.add('open');
+}
+
+function closeSaleCompletedModal() {
+  document.getElementById('modalSaleCompleted').classList.remove('open');
+}
+
+// ─── REPORTES DE VENTAS ───────────────────────────────────────────────────────
+let _chartPC = null;
+let _reportePCData = null;
+
+function toggleReportePC() {
+  const panel = document.getElementById('reportePCPanel');
+  const isVisible = panel.style.display !== 'none';
+  panel.style.display = isVisible ? 'none' : '';
+  if (!isVisible) {
+    document.getElementById('reportePCContent').style.display = 'none';
+    document.getElementById('reportePCMenu').style.display = '';
+  }
+}
+
+function generarReportePC(tipo) {
+  const now = new Date();
+  let data, labels, titulo;
+
+  if (tipo === 'semanal') {
+    // Últimos 7 días
+    const dias = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      dias.push({
+        fecha: d.toDateString(),
+        label: d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
+      });
+    }
+    data = dias.map(dia => {
+      const ventasDia = sales.filter(s => new Date(s.date).toDateString() === dia.fecha);
+      return ventasDia.reduce((sum, s) => sum + s.total, 0);
+    });
+    labels = dias.map(d => d.label);
+    titulo = '📅 Reporte Semanal — Últimos 7 días';
+  } else if (tipo === 'mensual') {
+    // Últimos 6 meses
+    const meses = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      meses.push({
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        label: d.toLocaleDateString('es-MX', { month: 'short', year: 'numeric' })
+      });
+    }
+    data = meses.map(mes => {
+      const ventasMes = sales.filter(s => {
+        const sd = new Date(s.date);
+        return sd.getFullYear() === mes.year && sd.getMonth() === mes.month;
+      });
+      return ventasMes.reduce((sum, s) => sum + s.total, 0);
+    });
+    labels = meses.map(m => m.label);
+    titulo = '📆 Reporte Mensual — Últimos 6 meses';
+  } else if (tipo === 'anual') {
+    // Últimos 3 años
+    const años = [];
+    for (let i = 2; i >= 0; i--) {
+      años.push(now.getFullYear() - i);
+    }
+    data = años.map(año => {
+      const ventasAño = sales.filter(s => new Date(s.date).getFullYear() === año);
+      return ventasAño.reduce((sum, s) => sum + s.total, 0);
+    });
+    labels = años.map(a => String(a));
+    titulo = '📈 Reporte Anual — Últimos 3 años';
+  }
+
+  // Calcular estadísticas
+  const ventasPeriodo = tipo === 'semanal'
+    ? sales.filter(s => (now - new Date(s.date)) / (1000 * 60 * 60 * 24) <= 7)
+    : tipo === 'mensual'
+    ? sales.filter(s => (now - new Date(s.date)) / (1000 * 60 * 60 * 24) <= 180)
+    : sales.filter(s => (now - new Date(s.date)) / (1000 * 60 * 60 * 24) <= 1095);
+
+  const totalVentas = ventasPeriodo.length;
+  const totalVendido = ventasPeriodo.reduce((s, v) => s + v.total, 0);
+  const totalGanancia = ventasPeriodo.reduce((s, v) => s + v.profit, 0);
+  const promedioVenta = totalVentas > 0 ? totalVendido / totalVentas : 0;
+
+  // Top 10 productos
+  const productosVendidos = {};
+  ventasPeriodo.forEach(venta => {
+    venta.items.forEach(item => {
+      if (!productosVendidos[item.id]) {
+        productosVendidos[item.id] = { name: item.name, qty: 0, total: 0 };
+      }
+      productosVendidos[item.id].qty += item.qty;
+      productosVendidos[item.id].total += item.sellPrice * item.qty;
+    });
+  });
+  const top10 = Object.values(productosVendidos)
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 10);
+
+  _reportePCData = { tipo, data, labels, titulo, stats: { totalVentas, totalVendido, totalGanancia, promedioVenta }, top10 };
+  renderReportePC();
+}
+
+function renderReportePC() {
+  if (!_reportePCData) return;
+  const { tipo, data, labels, titulo, stats, top10 } = _reportePCData;
+
+  document.getElementById('reportePCMenu').style.display = 'none';
+  document.getElementById('reportePCContent').style.display = '';
+  document.getElementById('reportePCTitulo').textContent = titulo;
+
+  // Stats
+  document.getElementById('reportePCStats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--accent)">${stats.totalVentas}</div>
+      <div class="stat-label">Ventas</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--orange)">${fmt(stats.totalVendido)}</div>
+      <div class="stat-label">Total vendido</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--green)">${fmt(stats.totalGanancia)}</div>
+      <div class="stat-label">Ganancia</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--muted)">${fmt(stats.promedioVenta)}</div>
+      <div class="stat-label">Promedio/venta</div>
+    </div>
+  `;
+
+  // Top 10
+  if (top10.length > 0) {
+    document.getElementById('reportePCTop10').style.display = '';
+    document.getElementById('top10PCReport').innerHTML = top10.map((p, i) => `
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+        <div style="font-size:18px;font-weight:800;color:${i < 3 ? '#f59e0b' : 'var(--muted)'};min-width:30px">#${i + 1}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px">${p.name}</div>
+          <div style="font-size:12px;color:var(--muted)">${p.qty} unidades vendidas</div>
+        </div>
+        <div style="font-weight:800;font-size:15px;color:var(--accent)">${fmt(p.total)}</div>
+      </div>
+    `).join('');
+  } else {
+    document.getElementById('reportePCTop10').style.display = 'none';
+  }
+
+  // Gráfica
+  const ctx = document.getElementById('chartPC');
+  if (_chartPC) _chartPC.destroy();
+  _chartPC = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Ventas ($)',
+        data: data,
+        backgroundColor: 'rgba(29, 78, 216, 0.7)',
+        borderColor: 'rgba(29, 78, 216, 1)',
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => fmt(ctx.parsed.y)
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: (val) => '$' + val.toFixed(0)
+          }
+        }
+      }
+    }
+  });
+}
+
+function cerrarReportePC() {
+  document.getElementById('reportePCContent').style.display = 'none';
+  document.getElementById('reportePCMenu').style.display = '';
+  if (_chartPC) {
+    _chartPC.destroy();
+    _chartPC = null;
+  }
+  _reportePCData = null;
+}
+
+function reportePCPDF() {
+  if (!_reportePCData) return;
+  const { tipo, data, labels, titulo, stats, top10 } = _reportePCData;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'letter', orientation: 'portrait' });
+  const W = 216, PL = 20, PR = 20;
+  let y = 20;
+  const ln = (h = 5) => { y += h; };
+
+  // Encabezado
+  doc.setFontSize(22); doc.setFont('helvetica', 'bold');
+  doc.text(cfg.bizName || 'MI NEGOCIO', W / 2, y, { align: 'center' }); ln(8);
+  doc.setFontSize(14);
+  doc.text(titulo, W / 2, y, { align: 'center' }); ln(6);
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 120, 120);
+  doc.text(`Generado el ${new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`, W / 2, y, { align: 'center' });
+  doc.setTextColor(0, 0, 0); ln(10);
+  doc.setLineWidth(0.5); doc.line(PL, y, W - PR, y); ln(8);
+
+  // Estadísticas
+  doc.setFillColor(248, 248, 250);
+  doc.roundedRect(PL, y, W - PL - PR, 28, 3, 3, 'FD');
+  y += 6;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+  doc.text('Resumen del período:', PL + 6, y); ln(6);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  doc.text(`Total de ventas: ${stats.totalVentas}`, PL + 6, y); ln(5);
+  doc.text(`Total vendido: ${fmt(stats.totalVendido)}`, PL + 6, y); ln(5);
+  doc.text(`Ganancia: ${fmt(stats.totalGanancia)}`, PL + 6, y); ln(5);
+  doc.text(`Promedio por venta: ${fmt(stats.promedioVenta)}`, PL + 6, y); ln(8);
+
+  doc.setLineWidth(0.4); doc.line(PL, y, W - PR, y); ln(8);
+
+  // Top 10
+  if (top10.length > 0) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text('🏆 Top 10 Productos Más Vendidos', PL, y); ln(8);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    top10.forEach((p, i) => {
+      const medal = i < 3 ? ['🥇', '🥈', '🥉'][i] : `#${i + 1}`;
+      doc.text(`${medal} ${p.name}`, PL + 4, y);
+      doc.text(`${p.qty} uds`, PL + 110, y);
+      doc.text(fmt(p.total), W - PR, y, { align: 'right' });
+      ln(6);
+      if (y > 250) { doc.addPage(); y = 20; }
+    });
+  }
+
+  doc.save(`reporte_${tipo}_${new Date().toLocaleDateString('es-MX').replace(/\//g, '-')}.pdf`);
+  toast('📄 Reporte PDF descargado');
 }
 
 // ─── SETTINGS ─────────────────────────────────────────────────────────────────
