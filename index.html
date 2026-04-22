@@ -1385,14 +1385,14 @@ function updateLabelPreview() {
 }
 
 function printLabel(customer, total, saleDate, saleId = null) {
-  const nameSize  = cfg.labelNameSize   || 10;
-  const priceSize = cfg.labelPriceSize  || 16;
-  const margin    = cfg.labelMargin     !== undefined ? cfg.labelMargin : 2;
+  const nameSize  = cfg.labelNameSize   || 9;
+  const priceSize = cfg.labelPriceSize  || 14;
+  const margin    = cfg.labelMargin     !== undefined ? cfg.labelMargin : 1;
   const showDate  = cfg.labelShowDate   !== false;
 
   // Fecha: usa la de la venta si existe, si no usa hoy
   const dateObj = saleDate ? new Date(saleDate) : new Date();
-  const fecha   = dateObj.toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+  const fecha   = dateObj.toLocaleDateString('es-MX', { day:'2-digit', month:'short' });
 
   // Generar QR si hay saleId
   let qrDataURL = '';
@@ -1414,28 +1414,31 @@ function printLabel(customer, total, saleDate, saleId = null) {
       html, body { width:41mm; height:33mm; }
       body {
         display:flex;
-        justify-content:space-between;
+        flex-direction:column;
+        justify-content:center;
         align-items:center;
         font-family:Arial,sans-serif;
-        padding:${margin}mm 2mm;
+        padding:${margin}mm;
         background:white;
       }
       .info {
-        flex:1;
-        display:flex;
-        flex-direction:column;
-        justify-content:center;
+        width:100%;
+        text-align:center;
+        margin-bottom:1mm;
       }
-      .name  { font-size:${nameSize}pt;  font-weight:bold; line-height:1.1; margin-bottom:0.5mm; }
-      .total { font-size:${priceSize}pt; font-weight:bold; margin-top:0.5mm; letter-spacing:-0.5px; }
-      .fecha { font-size:6.5pt; color:#444; margin-top:0.5mm; }
-      .qr { width:18mm; height:18mm; margin-left:2mm; }
+      .name  { font-size:${nameSize}pt; font-weight:bold; line-height:1; margin-bottom:0.3mm; }
+      .price-date { display:flex; justify-content:center; align-items:center; gap:2mm; margin-top:0.3mm; }
+      .total { font-size:${priceSize}pt; font-weight:bold; }
+      .fecha { font-size:6pt; color:#666; }
+      .qr { width:26mm; height:26mm; display:block; }
     </style>
   </head><body onload="setTimeout(()=>{window.print();},200)">
     <div class="info">
       <div class="name">${escHtml(customer)}</div>
-      <div class="total">$${parseFloat(total).toFixed(2)}</div>
-      ${showDate ? `<div class="fecha">${fecha}</div>` : ''}
+      <div class="price-date">
+        <span class="total">$${parseFloat(total).toFixed(2)}</span>
+        ${showDate ? `<span class="fecha">${fecha}</span>` : ''}
+      </div>
     </div>
     ${qrHTML}
   </body></html>`);
