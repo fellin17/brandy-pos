@@ -1402,16 +1402,16 @@ function printLabel(customer, total, saleDate, saleId = null) {
     qrDataURL = makeQRDataURL(qrText);
   }
 
-  const win = window.open('', '_blank', 'width=200,height=150');
+  const win = window.open('', '_blank', 'width=200,height=180');
   if (!win) { toast('Permite ventanas emergentes para imprimir etiquetas', 'error'); return; }
   
   const qrHTML = qrDataURL ? `<img src="${qrDataURL}" class="qr" />` : '';
   
   win.document.write(`<!DOCTYPE html><html><head>
     <style>
-      @page { size: 41mm 25mm; margin: 0; }
+      @page { size: 41mm 33mm; margin: 0; }
       * { margin:0; padding:0; box-sizing:border-box; }
-      html, body { width:41mm; height:25mm; }
+      html, body { width:41mm; height:33mm; }
       body {
         display:flex;
         justify-content:space-between;
@@ -1429,7 +1429,7 @@ function printLabel(customer, total, saleDate, saleId = null) {
       .name  { font-size:${nameSize}pt;  font-weight:bold; line-height:1.1; margin-bottom:0.5mm; }
       .total { font-size:${priceSize}pt; font-weight:bold; margin-top:0.5mm; letter-spacing:-0.5px; }
       .fecha { font-size:6.5pt; color:#444; margin-top:0.5mm; }
-      .qr { width:10mm; height:10mm; margin-left:2mm; }
+      .qr { width:18mm; height:18mm; margin-left:2mm; }
     </style>
   </head><body onload="setTimeout(()=>{window.print();},200)">
     <div class="info">
