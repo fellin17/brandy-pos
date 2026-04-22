@@ -236,6 +236,8 @@ return QRCode;
     <button class="active" onclick="showView('pos')">🛒 VENTA <small style="opacity:.6;font-size:9px">(F4)</small></button>
     <button onclick="showView('inventory')">📦 ALMACÉN</button>
     <button onclick="showView('history')">📋 HISTORIAL <small style="opacity:.6;font-size:9px">(F5)</small></button>
+    <button onclick="showView('entrega')">🚚 ENTREGA</button>
+    <button onclick="showView('finanzas')">💰 FINANZAS</button>
     <button onclick="showView('cut')">✂️ CORTE</button>
     <button onclick="showView('settings')">⚙️ CONFIG</button>
   </div>
@@ -430,6 +432,45 @@ return QRCode;
       <div id="histClientSummary" style="display:none;margin-bottom:12px"></div>
 
       <div id="historyList"></div>
+    </div>
+
+    <!-- ═══════════ VISTA: ENTREGA ═══════════ -->
+    <div id="view-entrega" style="display:none">
+      <div style="font-weight:700;font-size:16px;margin-bottom:16px">🚚 Modo Entrega</div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">📷 Escanear nota de la clienta</div>
+        <div style="padding:20px;text-align:center">
+          <button class="btn btn-primary btn-block" onclick="openScannerEntrega()" style="font-size:15px;padding:16px">
+            📷 Escanear QR de la nota
+          </button>
+          <p style="margin-top:12px;font-size:13px;color:var(--muted)">
+            Escanea el código QR que aparece en el ticket de la clienta
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">📋 Historial de entregas de hoy</div>
+        <div id="entregasHoy"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════ VISTA: FINANZAS ═══════════ -->
+    <div id="view-finanzas" style="display:none">
+      <div style="font-weight:700;font-size:16px;margin-bottom:16px">💰 Resumen Financiero</div>
+
+      <div class="stats-grid" style="margin-bottom:16px" id="finanzasStats"></div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">💵 Desglose por Método de Pago</div>
+        <div id="finanzasDesglose"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">📊 Ventas Pendientes de Pago</div>
+        <div id="finanzasPendientes"></div>
+      </div>
     </div>
 
     <!-- ═══════════ VISTA: CORTE ═══════════ -->
@@ -756,6 +797,50 @@ return QRCode;
 </div>
 
 <!-- ═══════════ TOAST ═══════════ -->
+<!-- ═══════════ MODAL: CONFIRMACIÓN DE ENTREGA ═══════════ -->
+<div class="modal-bg" id="modalEntrega">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header" style="background:linear-gradient(135deg,#7c3aed,#ec4899);color:white;border:none">
+      <h3>🚚 Confirmar Entrega</h3>
+      <button class="close-btn" onclick="closeEntregaModal()" style="color:white">×</button>
+    </div>
+    <div class="modal-body" style="padding:24px">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;font-weight:700">Cliente</div>
+        <div id="entregaCustomer" style="font-size:20px;font-weight:800;margin-bottom:16px"></div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;font-weight:700">Total de la nota</div>
+        <div id="entregaTotal" style="font-size:36px;font-weight:900;color:var(--accent);font-family:monospace;margin-bottom:20px"></div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:20px;margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:10px;text-transform:uppercase">¿El pago está realizado?</div>
+        <div style="display:flex;gap:10px;margin-bottom:20px">
+          <button id="btnEntregaPagado" onclick="selectEntregaPaymentStatus('pagado')" class="btn btn-ghost" style="flex:1;padding:14px;border:2px solid var(--border);font-size:14px;font-weight:700">
+            ✅ Pagado
+          </button>
+          <button id="btnEntregaPendiente" onclick="selectEntregaPaymentStatus('pendiente')" class="btn btn-ghost" style="flex:1;padding:14px;border:2px solid var(--border);font-size:14px;font-weight:700">
+            ⏳ Pendiente
+          </button>
+        </div>
+
+        <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:10px;text-transform:uppercase">Método de pago</div>
+        <div style="display:flex;gap:10px;margin-bottom:20px">
+          <button id="btnEntregaEfectivo" onclick="selectEntregaPaymentMethod('efectivo')" class="btn btn-ghost" style="flex:1;padding:14px;border:2px solid var(--border);font-size:14px;font-weight:700">
+            💵 Efectivo
+          </button>
+          <button id="btnEntregaTransferencia" onclick="selectEntregaPaymentMethod('transferencia')" class="btn btn-ghost" style="flex:1;padding:14px;border:2px solid var(--border);font-size:14px;font-weight:700">
+            💳 Transferencia
+          </button>
+        </div>
+
+        <button class="btn btn-success btn-block" onclick="confirmarEntrega()" style="font-size:15px;padding:14px">
+          ✅ Confirmar Entrega
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ MODAL: VENTA COMPLETADA ═══════════ -->
 <div class="modal-bg" id="modalSaleCompleted">
   <div class="modal" style="max-width:420px">
@@ -949,15 +1034,17 @@ function updateHeader() {
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function showView(v) {
-  ['pos','inventory','history','cut','settings'].forEach(id => {
+  ['pos','inventory','history','entrega','finanzas','cut','settings'].forEach(id => {
     document.getElementById('view-' + id).style.display = id === v ? '' : 'none';
   });
   document.querySelectorAll('#nav button').forEach((btn, i) => {
-    btn.classList.toggle('active', i === ['pos','inventory','history','cut','settings'].indexOf(v));
+    btn.classList.toggle('active', i === ['pos','inventory','history','entrega','finanzas','cut','settings'].indexOf(v));
   });
   if (v === 'inventory') renderInventory();
   if (v === 'cut')       renderCut();
   if (v === 'history')   renderHistory();
+  if (v === 'entrega')   renderEntrega();
+  if (v === 'finanzas')  renderFinanzas();
   if (v === 'settings')  loadSettings();
   // Al entrar a VENTA el cursor va al nombre de la clienta
   if (v === 'pos') setTimeout(() => document.getElementById('posCustomer').focus(), 50);
@@ -1210,6 +1297,18 @@ function updateCartUI() {
     </div>`;
 }
 
+// ─── VOZ ──────────────────────────────────────────────────────────────────────
+function speakText(text) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel(); // Cancelar cualquier voz anterior
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-MX';
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
 // ─── DESCUENTO ────────────────────────────────────────────────────────────────
 function setDiscount(pct) {
   cartDiscount = Math.max(0, Math.min(100, parseInt(pct) || 0));
@@ -1226,6 +1325,10 @@ function completeSale() {
   if (!sale) return;
 
   generateTicketPDF(sale);
+  
+  // Anunciar con voz
+  speakText(`Venta completada para ${customer}. Total: ${sale.total.toFixed(2)} pesos`);
+  
   showSaleCompletedModal(sale);
   clearCartUI();
   renderInventory();
@@ -1242,13 +1345,16 @@ function clearCartUI() {
 
 function printLabelFromCart() {
   const customer = document.getElementById('posCustomer').value.trim();
-  const total    = cart.reduce((s, i) => s + i.sellPrice * i.qty, 0);
+  const subtotal = cart.reduce((s, i) => s + i.sellPrice * i.qty, 0);
+  const descuentoMonto = subtotal * (cartDiscount / 100);
+  const total = subtotal - descuentoMonto;
+  
   if (!customer) { toast('Escribe el nombre de la clienta primero', 'error'); return; }
   if (!cart.length) { toast('El carrito está vacío', 'error'); return; }
 
-  saveSaleFromCart();
+  const sale = saveSaleFromCart();
   toast('Nota guardada en historial');
-  printLabel(customer, total, new Date().toISOString());
+  printLabel(customer, total, new Date().toISOString(), sale ? sale.id : null);
 }
 
 function updateLabelPreview() {
@@ -1278,7 +1384,7 @@ function updateLabelPreview() {
   if (prevDate) prevDate.style.display = showDate ? '' : 'none';
 }
 
-function printLabel(customer, total, saleDate) {
+function printLabel(customer, total, saleDate, saleId = null) {
   const nameSize  = cfg.labelNameSize   || 10;
   const priceSize = cfg.labelPriceSize  || 16;
   const margin    = cfg.labelMargin     !== undefined ? cfg.labelMargin : 2;
@@ -1286,30 +1392,52 @@ function printLabel(customer, total, saleDate) {
 
   // Fecha: usa la de la venta si existe, si no usa hoy
   const dateObj = saleDate ? new Date(saleDate) : new Date();
-  const fecha   = dateObj.toLocaleDateString('es-MX', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const fecha   = dateObj.toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+
+  // Generar QR si hay saleId
+  let qrDataURL = '';
+  if (saleId) {
+    const folio = saleId.slice(-8).toUpperCase();
+    const qrText = `ID:${saleId}\nFolio: #${folio}\nCliente: ${customer}\nTOTAL: $${parseFloat(total).toFixed(2)}`;
+    qrDataURL = makeQRDataURL(qrText);
+  }
 
   const win = window.open('', '_blank', 'width=200,height=150');
   if (!win) { toast('Permite ventanas emergentes para imprimir etiquetas', 'error'); return; }
+  
+  const qrHTML = qrDataURL ? `<img src="${qrDataURL}" class="qr" />` : '';
+  
   win.document.write(`<!DOCTYPE html><html><head>
     <style>
       @page { size: 41mm 25mm; margin: 0; }
       * { margin:0; padding:0; box-sizing:border-box; }
       html, body { width:41mm; height:25mm; }
       body {
-        display:flex; flex-direction:column;
-        justify-content:center; align-items:center;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
         font-family:Arial,sans-serif;
-        padding-top:${margin}mm; padding-left:2mm; padding-right:2mm; padding-bottom:1mm;
+        padding:${margin}mm 2mm;
         background:white;
       }
-      .name  { font-size:${nameSize}pt;  font-weight:bold; text-align:center; word-break:break-word; line-height:1.2; }
-      .total { font-size:${priceSize}pt; font-weight:bold; margin-top:1mm; letter-spacing:-0.5px; }
-      .fecha { font-size:6.5pt; color:#444; margin-top:1mm; }
+      .info {
+        flex:1;
+        display:flex;
+        flex-direction:column;
+        justify-content:center;
+      }
+      .name  { font-size:${nameSize}pt;  font-weight:bold; line-height:1.1; margin-bottom:0.5mm; }
+      .total { font-size:${priceSize}pt; font-weight:bold; margin-top:0.5mm; letter-spacing:-0.5px; }
+      .fecha { font-size:6.5pt; color:#444; margin-top:0.5mm; }
+      .qr { width:10mm; height:10mm; margin-left:2mm; }
     </style>
   </head><body onload="setTimeout(()=>{window.print();},200)">
-    <div class="name">${escHtml(customer)}</div>
-    <div class="total">$${parseFloat(total).toFixed(2)}</div>
-    ${showDate ? `<div class="fecha">${fecha}</div>` : ''}
+    <div class="info">
+      <div class="name">${escHtml(customer)}</div>
+      <div class="total">$${parseFloat(total).toFixed(2)}</div>
+      ${showDate ? `<div class="fecha">${fecha}</div>` : ''}
+    </div>
+    ${qrHTML}
   </body></html>`);
   win.document.close();
 }
@@ -1513,6 +1641,9 @@ function saveSaleFromCart() {
     discount: cartDiscount,       // porcentaje
     discountAmount: descuentoMonto, // monto
     subtotal: subtotal,           // subtotal antes de descuento
+    paymentMethod: 'efectivo',    // efectivo, transferencia - se actualiza en entrega
+    paymentStatus: 'pendiente',   // pagado, pendiente - se actualiza en entrega
+    deliveryStatus: 'no_entregado' // no_entregado, entregado
   };
 
   // Descontar stock
@@ -1603,6 +1734,9 @@ ${descLine}
 💰 *TOTAL: ${fmt(sale.total)}*
 ━━━━━━━━━━━━━
 ${cfg.msg || '¡Gracias por su compra!'}`;
+
+  // Anunciar con voz
+  speakText(`Enviando nota por WhatsApp a ${customer}. Total: ${sale.total.toFixed(2)} pesos`);
 
   toast('✅ Nota guardada en historial');
   clearCartUI();
@@ -1849,7 +1983,7 @@ function renderHistory() {
         <div style="display:flex;gap:12px;align-items:flex-start;margin-top:10px">
           <div style="flex:1;display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" onclick='generateTicketPDF(${JSON.stringify(s)})'>📄 PDF</button>
-            <button class="btn btn-ghost btn-sm" onclick="printLabel('${escJs(s.customer)}',${s.total},'${s.date}')">🏷️ Etiqueta</button>
+            <button class="btn btn-ghost btn-sm" onclick="printLabel('${escJs(s.customer)}',${s.total},'${s.date}','${s.id}')">🏷️ Etiqueta</button>
             <button class="btn btn-sm" style="background:#25D366;color:white;border:none;border-radius:6px;font-weight:700;cursor:pointer;padding:5px 10px;font-size:12px" onclick='shareWhatsApp(${JSON.stringify(s)})'>📲 WhatsApp</button>
             <button class="btn btn-sm" style="background:#f59e0b;color:white;border:none;border-radius:6px;font-weight:700;cursor:pointer;padding:5px 10px;font-size:12px" onclick="editarNota('${s.id}')">✏️ Editar</button>
             <button class="btn btn-sm" style="background:var(--red);color:white;border:none;border-radius:6px;font-weight:700;cursor:pointer;padding:5px 10px;font-size:12px" onclick="eliminarNota('${s.id}')">🗑️ Eliminar</button>
@@ -2535,6 +2669,297 @@ function reportePCPDF() {
 
   doc.save(`reporte_${tipo}_${new Date().toLocaleDateString('es-MX').replace(/\//g, '-')}.pdf`);
   toast('📄 Reporte PDF descargado');
+}
+
+// ─── ENTREGA ──────────────────────────────────────────────────────────────────
+let _entregaSale = null;
+let _entregaPaymentStatus = 'pagado';
+let _entregaPaymentMethod = 'efectivo';
+
+function renderEntrega() {
+  const hoy = new Date().toDateString();
+  const entregasHoy = sales.filter(s => {
+    return s.deliveryStatus === 'entregado' && new Date(s.date).toDateString() === hoy;
+  });
+
+  const lista = document.getElementById('entregasHoy');
+  if (!entregasHoy.length) {
+    lista.innerHTML = '<div class="empty"><div class="icon">📦</div><div>No hay entregas registradas hoy</div></div>';
+    return;
+  }
+
+  lista.innerHTML = `<table>
+    <thead><tr>
+      <th>Cliente</th>
+      <th>Total</th>
+      <th>Estatus Pago</th>
+      <th>Método</th>
+      <th>Hora</th>
+    </tr></thead>
+    <tbody>
+      ${entregasHoy.reverse().map(s => `<tr>
+        <td><strong>${s.customer}</strong></td>
+        <td>${fmt(s.total)}</td>
+        <td>
+          <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
+            ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+          </span>
+        </td>
+        <td>
+          <span class="tag" style="background:${s.paymentMethod === 'efectivo' ? '#ecfdf5' : '#ecfeff'};color:${s.paymentMethod === 'efectivo' ? '#16a34a' : '#0891b2'}">
+            ${s.paymentMethod === 'efectivo' ? '💵 Efectivo' : '💳 Transfer'}
+          </span>
+        </td>
+        <td style="font-size:12px;color:var(--muted)">${new Date(s.deliveryDate || s.date).toLocaleTimeString('es-MX')}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function openScannerEntrega() {
+  document.getElementById('modalScanner').classList.add('open');
+  document.getElementById('scannerResult').style.display = 'none';
+  setTimeout(() => startScannerEntrega(), 300);
+}
+
+function startScannerEntrega() {
+  if (_scanner) { try { _scanner.stop(); } catch {} }
+  _scanner = new Html5Qrcode('scannerView');
+  _scanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 250, height: 180 } },
+    (decodedText) => {
+      handleScanEntrega(decodedText);
+    },
+    () => {}
+  ).catch(err => {
+    toast('No se pudo acceder a la cámara: ' + err, 'error');
+    closeScanner();
+  });
+}
+
+function handleScanEntrega(code) {
+  // Buscar si es un QR de nota
+  const folioMatch = code.match(/Folio:\s*#?([A-Z0-9]+)/i);
+  if (!folioMatch) {
+    toast('QR no reconocido. Escanea el QR de una nota', 'error');
+    return;
+  }
+
+  const folio = folioMatch[1].toUpperCase();
+  const sale = sales.find(s => s.id.slice(-8).toUpperCase() === folio || s.id.slice(-6).toUpperCase() === folio);
+  
+  if (!sale) {
+    toast('Nota no encontrada: #' + folio, 'error');
+    return;
+  }
+
+  _entregaSale = sale;
+  _scanner.stop().catch(() => {});
+  document.getElementById('modalScanner').classList.remove('open');
+  
+  // Mostrar modal de confirmación con valores por defecto
+  document.getElementById('entregaCustomer').textContent = sale.customer;
+  document.getElementById('entregaTotal').textContent = fmt(sale.total);
+  
+  // Reset valores por defecto
+  _entregaPaymentStatus = 'pagado';
+  _entregaPaymentMethod = 'efectivo';
+  selectEntregaPaymentStatus('pagado');
+  selectEntregaPaymentMethod('efectivo');
+  
+  document.getElementById('modalEntrega').classList.add('open');
+
+  // Anunciar con voz
+  speakText(`Entrega para ${sale.customer}. Total: ${sale.total.toFixed(2)} pesos`);
+}
+
+function selectEntregaPaymentStatus(status) {
+  _entregaPaymentStatus = status;
+  const btnPagado = document.getElementById('btnEntregaPagado');
+  const btnPendiente = document.getElementById('btnEntregaPendiente');
+  
+  if (status === 'pagado') {
+    btnPagado.style.border = '2px solid var(--green)';
+    btnPagado.style.background = 'var(--green-light)';
+    btnPagado.style.color = 'var(--green)';
+    btnPendiente.style.border = '2px solid var(--border)';
+    btnPendiente.style.background = 'white';
+    btnPendiente.style.color = 'var(--text)';
+  } else {
+    btnPendiente.style.border = '2px solid var(--orange)';
+    btnPendiente.style.background = 'var(--orange-light)';
+    btnPendiente.style.color = 'var(--orange)';
+    btnPagado.style.border = '2px solid var(--border)';
+    btnPagado.style.background = 'white';
+    btnPagado.style.color = 'var(--text)';
+  }
+}
+
+function selectEntregaPaymentMethod(method) {
+  _entregaPaymentMethod = method;
+  const btnEfectivo = document.getElementById('btnEntregaEfectivo');
+  const btnTransferencia = document.getElementById('btnEntregaTransferencia');
+  
+  if (method === 'efectivo') {
+    btnEfectivo.style.border = '2px solid #16a34a';
+    btnEfectivo.style.background = '#ecfdf5';
+    btnEfectivo.style.color = '#16a34a';
+    btnTransferencia.style.border = '2px solid var(--border)';
+    btnTransferencia.style.background = 'white';
+    btnTransferencia.style.color = 'var(--text)';
+  } else {
+    btnTransferencia.style.border = '2px solid #0891b2';
+    btnTransferencia.style.background = '#ecfeff';
+    btnTransferencia.style.color = '#0891b2';
+    btnEfectivo.style.border = '2px solid var(--border)';
+    btnEfectivo.style.background = 'white';
+    btnEfectivo.style.color = 'var(--text)';
+  }
+}
+
+function closeEntregaModal() {
+  document.getElementById('modalEntrega').classList.remove('open');
+  _entregaSale = null;
+}
+
+function confirmarEntrega() {
+  if (!_entregaSale) return;
+
+  const sale = sales.find(s => s.id === _entregaSale.id);
+  if (!sale) return;
+
+  // Actualizar estatus con las selecciones del usuario
+  sale.deliveryStatus = 'entregado';
+  sale.deliveryDate = new Date().toISOString();
+  sale.paymentStatus = _entregaPaymentStatus;
+  sale.paymentMethod = _entregaPaymentMethod;
+
+  saveAll();
+
+  // Crear mensaje de WhatsApp
+  const statusPago = _entregaPaymentStatus === 'pagado' ? '✅ PAGADO' : '⏳ PENDIENTE DE PAGO';
+  const msg = `🤖✨ CONFIRMACIÓN AUTOMÁTICA DE OPERACIÓN
+━━━━━━━━━━━━━━━
+💳 ESTATUS DE PAGO: ${statusPago}
+📦 ESTATUS DE ENTREGA: ✅ ENTREGADO
+━━━━━━━━━━━━━━━
+🧾 PROCESO COMPLETADO EXITOSAMENTE
+📊 La operación ha sido registrada correctamente en nuestro sistema.
+
+💖 ¡GRACIAS POR TU COMPRA!
+Tu confianza significa mucho para nosotros. Es un gusto poder atenderte. 🫶
+
+━━━━━━━━━━━━━━━
+🌷 Te deseamos un día lleno de cosas bonitas,
+✨ alegría, bienestar y momentos felices.
+😊 ¡Gracias por formar parte de nuestra comunidad!`;
+
+  closeEntregaModal();
+  toast(`✅ Entrega confirmada - ${sale.customer}`);
+  renderEntrega();
+
+  // Enviar WhatsApp
+  if (sale.phone) {
+    window.location.href = `whatsapp://send?phone=52${sale.phone}&text=${encodeURIComponent(msg)}`;
+  } else {
+    window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+  }
+}
+
+// ─── FINANZAS ─────────────────────────────────────────────────────────────────
+function renderFinanzas() {
+  const ventasHoy = sales.filter(s => {
+    const hoy = new Date().toDateString();
+    return new Date(s.date).toDateString() === hoy;
+  });
+
+  const totalEfectivo = ventasHoy
+    .filter(s => s.paymentStatus === 'pagado' && s.paymentMethod === 'efectivo')
+    .reduce((sum, s) => sum + s.total, 0);
+
+  const totalTransferencia = ventasHoy
+    .filter(s => s.paymentStatus === 'pagado' && s.paymentMethod === 'transferencia')
+    .reduce((sum, s) => sum + s.total, 0);
+
+  const totalPendiente = ventasHoy
+    .filter(s => s.paymentStatus === 'pendiente')
+    .reduce((sum, s) => sum + s.total, 0);
+
+  const totalGeneral = totalEfectivo + totalTransferencia;
+
+  // Stats
+  document.getElementById('finanzasStats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--green)">${fmt(totalGeneral)}</div>
+      <div class="stat-label">Total Recibido</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:#16a34a">${fmt(totalEfectivo)}</div>
+      <div class="stat-label">💵 Efectivo</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:#0891b2">${fmt(totalTransferencia)}</div>
+      <div class="stat-label">💳 Transferencia</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--orange)">${fmt(totalPendiente)}</div>
+      <div class="stat-label">⏳ Pendiente</div>
+    </div>
+  `;
+
+  // Desglose por método
+  document.getElementById('finanzasDesglose').innerHTML = `
+    <div style="padding:16px">
+      <div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-weight:700;font-size:14px">💵 Efectivo</span>
+          <span style="font-weight:800;font-size:16px;color:#16a34a">${fmt(totalEfectivo)}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">
+          ${ventasHoy.filter(s => s.paymentStatus === 'pagado' && s.paymentMethod === 'efectivo').length} ventas
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-weight:700;font-size:14px">💳 Transferencia</span>
+          <span style="font-weight:800;font-size:16px;color:#0891b2">${fmt(totalTransferencia)}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">
+          ${ventasHoy.filter(s => s.paymentStatus === 'pagado' && s.paymentMethod === 'transferencia').length} ventas
+        </div>
+      </div>
+      <div style="border-top:2px solid var(--border);padding-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:800;font-size:15px">TOTAL QUE DEBES TENER</span>
+          <span style="font-weight:900;font-size:20px;color:var(--green)">${fmt(totalGeneral)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Pendientes
+  const pendientes = ventasHoy.filter(s => s.paymentStatus === 'pendiente');
+  const divPendientes = document.getElementById('finanzasPendientes');
+  
+  if (!pendientes.length) {
+    divPendientes.innerHTML = '<div class="empty"><div class="icon">✅</div><div>No hay ventas pendientes de pago hoy</div></div>';
+  } else {
+    divPendientes.innerHTML = `<table>
+      <thead><tr>
+        <th>Cliente</th>
+        <th style="text-align:right">Total</th>
+        <th>Hora</th>
+      </tr></thead>
+      <tbody>
+        ${pendientes.map(s => `<tr>
+          <td><strong>${s.customer}</strong></td>
+          <td style="text-align:right;font-weight:700;color:var(--orange)">${fmt(s.total)}</td>
+          <td style="font-size:12px;color:var(--muted)">${new Date(s.date).toLocaleTimeString('es-MX')}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  }
 }
 
 // ─── SETTINGS ─────────────────────────────────────────────────────────────────

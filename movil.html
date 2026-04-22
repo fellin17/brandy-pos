@@ -130,7 +130,9 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
   <button class="active" onclick="showTab('scanner')"><span>📷</span>Escanear</button>
   <button onclick="showTab('inventario')"><span>📦</span>Inventario</button>
   <button onclick="showTab('venta')"><span>🛒</span>Venta</button>
+  <button onclick="showTab('entrega')"><span>🚚</span>Entrega</button>
   <button onclick="showTab('notas')"><span>📋</span>Notas</button>
+  <button onclick="showTab('finanzas')"><span>💰</span>Finanzas</button>
   <button onclick="showTab('agregar')"><span>➕</span>Producto</button>
 </div>
 
@@ -389,6 +391,38 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
     <div id="ultimosProductos"></div>
   </div>
 </div>
+
+<!-- ═══ TAB: ENTREGA ═══ -->
+<div id="tab-entrega" class="content" style="display:none">
+  <button class="scan-big" onclick="openScannerEntregaMob()">
+    <span class="icon">🚚</span>
+    <span class="label">Escanear Nota para Entregar</span>
+    <span class="sub">Confirma entrega y estatus de pago</span>
+  </button>
+
+  <div class="card">
+    <div class="card-title">📋 Entregas de hoy</div>
+    <div id="entregasHoyMob"></div>
+  </div>
+</div>
+
+<!-- ═══ TAB: FINANZAS ═══ -->
+<div id="tab-finanzas" class="content" style="display:none">
+  <div style="font-weight:800;font-size:17px;margin-bottom:14px;text-align:center">💰 Resumen Financiero</div>
+  
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px" id="finanzasStatsMob"></div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">💵 Desglose por Método de Pago</div>
+    <div id="finanzasDesgloseMob"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⏳ Ventas Pendientes de Pago</div>
+    <div id="finanzasPendientesMob"></div>
+  </div>
+</div>
+
 <div class="summary-bar" id="summaryBar" style="display:none">
   <div>
     <div class="total-label">Total</div>
@@ -482,15 +516,19 @@ function setSyncStatus(msg) {
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────
 function showTab(tab) {
-  ['scanner','inventario','venta','notas','agregar'].forEach(t => {
+  ['scanner','inventario','venta','entrega','notas','finanzas','agregar'].forEach(t => {
     document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
   });
   document.querySelectorAll('.nav button').forEach((btn, i) => {
-    btn.classList.toggle('active', ['scanner','inventario','venta','notas','agregar'][i] === tab);
+    btn.classList.toggle('active', ['scanner','inventario','venta','entrega','notas','finanzas','agregar'][i] === tab);
   });
   stopScan();
   if (tab === 'venta') updateCartUI();
   if (tab === 'agregar') renderUltimosProductos();
+  if (tab === 'inventario') renderInventario();
+  if (tab === 'notas') renderNotas();
+  if (tab === 'entrega') renderEntregaMob();
+  if (tab === 'finanzas') renderFinanzasMob();
 }
 
 // ─── SCANNER ──────────────────────────────────────────────────────────────────
@@ -642,6 +680,11 @@ function handleCode(code) {
     showTab('notas');
     document.getElementById('notaSearch').value = code;
     renderNotas();
+    return;
+  }
+
+  if (scanMode === 'entrega') {
+    handleScanEntregaMob(code);
     return;
   }
 
@@ -939,7 +982,10 @@ async function completarVenta() {
     customer,
     items: cart.map(i => ({ ...i })),
     total, profit, inCut: false,
-    qrData: `ID:${Date.now().toString()}\nFolio: #${Date.now().toString().slice(-8).toUpperCase()}\nCliente: ${customer}\nTOTAL: $${total.toFixed(2)}`
+    qrData: `ID:${Date.now().toString()}\nFolio: #${Date.now().toString().slice(-8).toUpperCase()}\nCliente: ${customer}\nTOTAL: $${total.toFixed(2)}`,
+    paymentMethod: 'efectivo',
+    paymentStatus: 'pendiente',
+    deliveryStatus: 'no_entregado'
   };
 
   // Descontar stock
@@ -950,6 +996,9 @@ async function completarVenta() {
 
   sales.push(sale);
   await saveData();
+
+  // Anunciar con voz
+  speakText(`Venta completada para ${customer}. Total: ${total.toFixed(2)} pesos`);
 
   // WhatsApp
   const lineas = sale.items.map(i => `• ${i.name} ×${i.qty} — $${(i.sellPrice * i.qty).toFixed(2)}`).join('\n');
@@ -963,6 +1012,7 @@ async function completarVenta() {
   toast('✅ Venta guardada');
   setTimeout(() => {
     if (confirm('¿Enviar por WhatsApp?')) {
+      speakText(`Enviando nota por WhatsApp a ${customer}. Total: ${total.toFixed(2)} pesos`);
       window.location.href = 'whatsapp://send?text=' + encodeURIComponent(msg);
     }
   }, 500);
@@ -1017,6 +1067,7 @@ function buildNotaHTML(s) {
     <div style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-wa btn-sm" onclick="waShare('${s.id}')">📲 WhatsApp</button>
       <button class="btn btn-sm" style="background:var(--blue);color:white;width:auto;margin:0" onclick="generarPDFNota('${s.id}')">📄 PDF</button>
+      <button class="btn btn-sm" style="background:#f59e0b;color:white;width:auto;margin:0" onclick="printLabelMob('${s.id}')">🏷️ Etiqueta</button>
     </div>
   </div>`;
 }
@@ -1584,6 +1635,269 @@ function editarProducto(id) {
   calcMargen();
   window.scrollTo({ top: 0, behavior: 'smooth' });
   toast('✏️ Editando: ' + p.name, 'info');
+}
+
+// ─── ETIQUETAS MÓVIL ──────────────────────────────────────────────────────────
+function makeQRDataURL(text) {
+  try {
+    const div = document.createElement('div');
+    div.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+    document.body.appendChild(div);
+    new QRCode(div, {
+      text: text,
+      width: 160, height: 160,
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+    const canvas = div.querySelector('canvas');
+    const dataUrl = canvas ? canvas.toDataURL('image/png') : null;
+    document.body.removeChild(div);
+    return dataUrl;
+  } catch(e) { return null; }
+}
+
+function printLabelMob(saleId) {
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) { toast('Nota no encontrada', 'error'); return; }
+  
+  const customer = sale.customer;
+  const total = sale.total;
+  const dateObj = new Date(sale.date);
+  const fecha = dateObj.toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+  
+  // Generar QR
+  const folio = saleId.slice(-8).toUpperCase();
+  const qrText = `ID:${saleId}\nFolio: #${folio}\nCliente: ${customer}\nTOTAL: $${total.toFixed(2)}`;
+  const qrDataURL = makeQRDataURL(qrText);
+  
+  const qrHTML = qrDataURL ? `<img src="${qrDataURL}" class="qr" />` : '';
+  
+  const win = window.open('', '_blank', 'width=200,height=150');
+  if (!win) { toast('Permite ventanas emergentes para imprimir etiquetas', 'error'); return; }
+  
+  win.document.write(`<!DOCTYPE html><html><head>
+    <style>
+      @page { size: 41mm 25mm; margin: 0; }
+      * { margin:0; padding:0; box-sizing:border-box; }
+      html, body { width:41mm; height:25mm; }
+      body {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        font-family:Arial,sans-serif;
+        padding:2mm;
+        background:white;
+      }
+      .info {
+        flex:1;
+        display:flex;
+        flex-direction:column;
+        justify-content:center;
+      }
+      .name  { font-size:10pt;  font-weight:bold; line-height:1.1; margin-bottom:0.5mm; }
+      .total { font-size:16pt; font-weight:bold; margin-top:0.5mm; letter-spacing:-0.5px; }
+      .fecha { font-size:6.5pt; color:#444; margin-top:0.5mm; }
+      .qr { width:10mm; height:10mm; margin-left:2mm; }
+    </style>
+  </head><body onload="setTimeout(()=>{window.print();},200)">
+    <div class="info">
+      <div class="name">${customer.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+      <div class="total">$${total.toFixed(2)}</div>
+      <div class="fecha">${fecha}</div>
+    </div>
+    ${qrHTML}
+  </body></html>`);
+  win.document.close();
+}
+
+// ─── VOZ ──────────────────────────────────────────────────────────────────────
+function speakText(text) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-MX';
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
+// ─── ENTREGA MÓVIL ────────────────────────────────────────────────────────────
+let _entregaSaleMob = null;
+
+function renderEntregaMob() {
+  const hoy = new Date().toDateString();
+  const entregasHoy = sales.filter(s => {
+    return s.deliveryStatus === 'entregado' && new Date(s.date).toDateString() === hoy;
+  });
+
+  const lista = document.getElementById('entregasHoyMob');
+  if (!entregasHoy.length) {
+    lista.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">No hay entregas registradas hoy</div>';
+    return;
+  }
+
+  lista.innerHTML = entregasHoy.reverse().map(s => `
+    <div style="padding:12px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <strong style="font-size:14px">${s.customer}</strong>
+        <strong style="color:var(--accent);font-size:15px">$${s.total.toFixed(2)}</strong>
+      </div>
+      <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap">
+        <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
+          ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+        </span>
+        <span class="tag" style="background:${s.paymentMethod === 'efectivo' ? '#ecfdf5' : '#ecfeff'};color:${s.paymentMethod === 'efectivo' ? '#16a34a' : '#0891b2'}">
+          ${s.paymentMethod === 'efectivo' ? '💵 Efectivo' : '💳 Transfer'}
+        </span>
+        <span style="color:var(--muted)">${new Date(s.deliveryDate || s.date).toLocaleTimeString('es-MX')}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openScannerEntregaMob() {
+  startScan('entrega');
+}
+
+function handleScanEntregaMob(code) {
+  const folioMatch = code.match(/Folio:\s*#?([A-Z0-9]+)/i);
+  if (!folioMatch) {
+    toast('QR no reconocido. Escanea el QR de una nota', 'error');
+    return;
+  }
+
+  const folio = folioMatch[1].toUpperCase();
+  const sale = sales.find(s => s.id.slice(-8).toUpperCase() === folio || s.id.slice(-6).toUpperCase() === folio);
+  
+  if (!sale) {
+    toast('Nota no encontrada: #' + folio, 'error');
+    return;
+  }
+
+  _entregaSaleMob = sale;
+  stopScan();
+  
+  // Anunciar con voz
+  speakText(`Entrega para ${sale.customer}. Total: ${sale.total.toFixed(2)} pesos`);
+  
+  // Preguntar estatus de pago
+  const pagado = confirm(`💳 ¿El pago está REALIZADO?\n\nCliente: ${sale.customer}\nTotal: $${sale.total.toFixed(2)}\n\n✅ OK = Pagado\n❌ Cancelar = Pendiente`);
+  const paymentStatus = pagado ? 'pagado' : 'pendiente';
+
+  // Preguntar método de pago
+  const efectivo = confirm(`💰 ¿El pago fue en EFECTIVO?\n\n✅ OK = Efectivo 💵\n❌ Cancelar = Transferencia 💳`);
+  const paymentMethod = efectivo ? 'efectivo' : 'transferencia';
+  
+  confirmarEntregaMob(paymentStatus, paymentMethod);
+}
+
+function confirmarEntregaMob(paymentStatus, paymentMethod) {
+  if (!_entregaSaleMob) return;
+
+  const sale = sales.find(s => s.id === _entregaSaleMob.id);
+  if (!sale) return;
+
+  sale.deliveryStatus = 'entregado';
+  sale.deliveryDate = new Date().toISOString();
+  sale.paymentStatus = paymentStatus;
+  sale.paymentMethod = paymentMethod;
+
+  saveData();
+
+  const statusPago = paymentStatus === 'pagado' ? '✅ PAGADO' : '⏳ PENDIENTE DE PAGO';
+  const msg = `🤖✨ CONFIRMACIÓN AUTOMÁTICA DE OPERACIÓN
+━━━━━━━━━━━━━━━
+💳 ESTATUS DE PAGO: ${statusPago}
+📦 ESTATUS DE ENTREGA: ✅ ENTREGADO
+━━━━━━━━━━━━━━━
+🧾 PROCESO COMPLETADO EXITOSAMENTE
+📊 La operación ha sido registrada correctamente en nuestro sistema.
+
+💖 ¡GRACIAS POR TU COMPRA!
+Tu confianza significa mucho para nosotros. Es un gusto poder atenderte. 🫶
+
+━━━━━━━━━━━━━━━
+🌷 Te deseamos un día lleno de cosas bonitas,
+✨ alegría, bienestar y momentos felices.
+😊 ¡Gracias por formar parte de nuestra comunidad!`;
+
+  toast(`✅ Entrega confirmada - ${sale.customer}`);
+  renderEntregaMob();
+  _entregaSaleMob = null;
+
+  window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+}
+
+// ─── FINANZAS MÓVIL ───────────────────────────────────────────────────────────
+function renderFinanzasMob() {
+  const ventasHoy = sales.filter(s => {
+    const hoy = new Date().toDateString();
+    return new Date(s.date).toDateString() === hoy;
+  });
+
+  const totalEfectivo = ventasHoy
+    .filter(s => s.paymentStatus === 'pagado' && s.paymentMethod === 'efectivo')
+    .reduce((sum, s) => sum + s.total, 0);
+
+  const totalTransferencia = ventasHoy
+    .filter(s => s.paymentStatus === 'pagado' && s.paymentMethod === 'transferencia')
+    .reduce((sum, s) => sum + s.total, 0);
+
+  const totalPendiente = ventasHoy
+    .filter(s => s.paymentStatus === 'pendiente')
+    .reduce((sum, s) => sum + s.total, 0);
+
+  const totalGeneral = totalEfectivo + totalTransferencia;
+
+  // Stats
+  document.getElementById('finanzasStatsMob').innerHTML = `
+    <div style="background:var(--green-light);border:1.5px solid var(--green);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:20px;font-weight:900;color:var(--green)">$${totalGeneral.toFixed(2)}</div>
+      <div style="font-size:11px;color:var(--green);font-weight:700;margin-top:4px">TOTAL RECIBIDO</div>
+    </div>
+    <div style="background:#ecfdf5;border:1.5px solid #16a34a;border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:20px;font-weight:900;color:#16a34a">$${totalEfectivo.toFixed(2)}</div>
+      <div style="font-size:11px;color:#16a34a;font-weight:700;margin-top:4px">💵 EFECTIVO</div>
+    </div>
+    <div style="background:#ecfeff;border:1.5px solid #0891b2;border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:20px;font-weight:900;color:#0891b2">$${totalTransferencia.toFixed(2)}</div>
+      <div style="font-size:11px;color:#0891b2;font-weight:700;margin-top:4px">💳 TRANSFERENCIA</div>
+    </div>
+    <div style="background:var(--orange-light);border:1.5px solid var(--orange);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:20px;font-weight:900;color:var(--orange)">$${totalPendiente.toFixed(2)}</div>
+      <div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:4px">⏳ PENDIENTE</div>
+    </div>
+  `;
+
+  // Desglose
+  document.getElementById('finanzasDesgloseMob').innerHTML = `
+    <div style="padding:14px">
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:2px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:800;font-size:15px">TOTAL QUE DEBES TENER</span>
+          <span style="font-weight:900;font-size:22px;color:var(--green)">$${totalGeneral.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Pendientes
+  const pendientes = ventasHoy.filter(s => s.paymentStatus === 'pendiente');
+  const divPend = document.getElementById('finanzasPendientesMob');
+  
+  if (!pendientes.length) {
+    divPend.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">✅ No hay ventas pendientes de pago hoy</div>';
+  } else {
+    divPend.innerHTML = pendientes.map(s => `
+      <div style="padding:12px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <strong style="font-size:14px">${s.customer}</strong>
+          <strong style="color:var(--orange);font-size:16px">$${s.total.toFixed(2)}</strong>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">${new Date(s.date).toLocaleTimeString('es-MX')}</div>
+      </div>
+    `).join('');
+  }
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
