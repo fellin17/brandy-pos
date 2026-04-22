@@ -630,7 +630,7 @@ return QRCode;
       </div>
 
       <div class="settings-section">
-        <h3>🏷️ Impresora de Etiquetas (41×25mm)</h3>
+        <h3>🏷️ Impresora de Etiquetas (41×33mm)</h3>
         <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
           Al imprimir etiquetas se abre la ventana de impresión. Selecciona tu impresora térmica y configura:<br>
           • Tamaño de papel: <strong>41mm × 25mm</strong><br>
@@ -696,11 +696,11 @@ return QRCode;
         <!-- Preview de etiqueta -->
         <div style="margin-bottom:14px">
           <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">
-            Vista previa (tamaño real 41×25mm)
+            Vista previa (tamaño real 41×33mm)
           </div>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
             <div id="labelPreview" style="
-              width:154.9px; height:94.5px;
+              width:154.9px; height:124.7px;
               border:2px dashed var(--border); border-radius:4px;
               background:white; display:flex; flex-direction:column;
               align-items:center; justify-content:center;
@@ -712,7 +712,7 @@ return QRCode;
               <div id="prevDate"  style="font-family:Arial,sans-serif;font-size:7pt;color:#555;margin-top:2px;">29/03/2026</div>
             </div>
             <div style="font-size:11px;color:var(--muted);line-height:1.6">
-              📐 Escala real 41×25mm<br>
+              📐 Escala real 41×33mm<br>
               ✏️ Ajusta los sliders<br>
               &nbsp;&nbsp;&nbsp;para ver cambios
             </div>
@@ -1386,8 +1386,8 @@ function updateLabelPreview() {
 
 function printLabel(customer, total, saleDate, saleId = null) {
   const nameSize  = cfg.labelNameSize   || 9;
-  const priceSize = cfg.labelPriceSize  || 14;
-  const margin    = cfg.labelMargin     !== undefined ? cfg.labelMargin : 1;
+  const priceSize = cfg.labelPriceSize  || 13;
+  const margin    = cfg.labelMargin     !== undefined ? cfg.labelMargin : 2;
   const showDate  = cfg.labelShowDate   !== false;
 
   // Fecha: usa la de la venta si existe, si no usa hoy
@@ -1415,7 +1415,7 @@ function printLabel(customer, total, saleDate, saleId = null) {
       body {
         display:flex;
         flex-direction:column;
-        justify-content:center;
+        justify-content:space-between;
         align-items:center;
         font-family:Arial,sans-serif;
         padding:${margin}mm;
@@ -1424,13 +1424,12 @@ function printLabel(customer, total, saleDate, saleId = null) {
       .info {
         width:100%;
         text-align:center;
-        margin-bottom:1mm;
       }
-      .name  { font-size:${nameSize}pt; font-weight:bold; line-height:1; margin-bottom:0.3mm; }
-      .price-date { display:flex; justify-content:center; align-items:center; gap:2mm; margin-top:0.3mm; }
+      .name  { font-size:${nameSize}pt; font-weight:bold; line-height:1.1; margin-bottom:0.5mm; }
+      .price-date { display:flex; justify-content:center; align-items:baseline; gap:2mm; margin-top:0.5mm; }
       .total { font-size:${priceSize}pt; font-weight:bold; }
       .fecha { font-size:6pt; color:#666; }
-      .qr { width:26mm; height:26mm; display:block; }
+      .qr { width:23mm; height:23mm; display:block; }
     </style>
   </head><body onload="setTimeout(()=>{window.print();},200)">
     <div class="info">
