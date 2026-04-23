@@ -645,7 +645,13 @@ function handleCode(code) {
 
   console.log('Código escaneado:', code);
 
-  // ¿Es un QR de nota? — detectar por múltiples patrones
+  // PRIMERO: Verificar el modo de escaneo específico
+  if (scanMode === 'entrega') {
+    handleScanEntregaMob(code);
+    return;
+  }
+
+  // SEGUNDO: ¿Es un QR de nota? — detectar por múltiples patrones
   const esNota = code.includes('Folio:') || 
                  code.includes('Cliente:') || 
                  code.includes('TOTAL:') ||
@@ -699,11 +705,6 @@ function handleCode(code) {
     showTab('notas');
     document.getElementById('notaSearch').value = code;
     renderNotas();
-    return;
-  }
-
-  if (scanMode === 'entrega') {
-    handleScanEntregaMob(code);
     return;
   }
 
