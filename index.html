@@ -450,8 +450,13 @@ return QRCode;
         </div>
       </div>
 
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header" style="background:var(--orange-light);color:var(--orange);border-color:var(--orange)">📦 Pendientes de Entrega</div>
+        <div id="entregasPendientes"></div>
+      </div>
+
       <div class="card">
-        <div class="card-header">📋 Historial de entregas de hoy</div>
+        <div class="card-header" style="background:var(--green-light);color:var(--green);border-color:var(--green)">✅ Entregas Realizadas Hoy</div>
         <div id="entregasHoy"></div>
       </div>
     </div>
@@ -2710,48 +2715,97 @@ let _entregaPaymentMethod = 'efectivo';
 
 function renderEntrega() {
   const hoy = new Date().toDateString();
+  
+  // Pendientes de entrega (todas las que no se han entregado)
+  const pendientes = sales.filter(s => s.deliveryStatus !== 'entregado');
+  
+  // Entregas realizadas hoy
   const entregasHoy = sales.filter(s => {
     return s.deliveryStatus === 'entregado' && new Date(s.date).toDateString() === hoy;
   });
 
-  const lista = document.getElementById('entregasHoy');
-  if (!entregasHoy.length) {
-    lista.innerHTML = '<div class="empty"><div class="icon">📦</div><div>No hay entregas registradas hoy</div></div>';
-    return;
+  // Renderizar pendientes
+  const listaPendientes = document.getElementById('entregasPendientes');
+  if (!pendientes.length) {
+    listaPendientes.innerHTML = '<div class="empty"><div class="icon">✅</div><div>No hay entregas pendientes</div></div>';
+  } else {
+    listaPendientes.innerHTML = `<table>
+      <thead><tr>
+        <th>Cliente</th>
+        <th>Total</th>
+        <th>Estatus Pago</th>
+        <th>Fecha Venta</th>
+      </tr></thead>
+      <tbody>
+        ${pendientes.reverse().map(s => `<tr>
+          <td><strong>${s.customer}</strong></td>
+          <td>${fmt(s.total)}</td>
+          <td>
+            <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
+              ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+            </span>
+          </td>
+          <td style="font-size:12px;color:var(--muted)">${new Date(s.date).toLocaleDateString('es-MX')} ${new Date(s.date).toLocaleTimeString('es-MX')}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
   }
 
-  lista.innerHTML = `<table>
-    <thead><tr>
-      <th>Cliente</th>
-      <th>Total</th>
-      <th>Estatus Pago</th>
-      <th>Método</th>
-      <th>Hora</th>
-      <th style="text-align:center">Acción</th>
-    </tr></thead>
-    <tbody>
-      ${entregasHoy.reverse().map(s => `<tr>
-        <td><strong>${s.customer}</strong></td>
-        <td>${fmt(s.total)}</td>
-        <td>
-          <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
-            ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
-          </span>
-        </td>
-        <td>
-          <span class="tag" style="background:${s.paymentMethod === 'efectivo' ? '#ecfdf5' : '#ecfeff'};color:${s.paymentMethod === 'efectivo' ? '#16a34a' : '#0891b2'}">
-            ${s.paymentMethod === 'efectivo' ? '💵 Efectivo' : '💳 Transfer'}
-          </span>
-        </td>
-        <td style="font-size:12px;color:var(--muted)">${new Date(s.deliveryDate || s.date).toLocaleTimeString('es-MX')}</td>
-        <td style="text-align:center">
-          <button class="btn btn-ghost btn-sm" onclick="enviarWhatsAppEntrega('${s.id}')" style="background:var(--green-light);color:var(--green)">
-            📲 WhatsApp
-          </button>
-        </td>
-      </tr>`).join('')}
-    </tbody>
-  </table>`;
+  // Renderizar entregas realizadas hoy
+  const listaEntregadas = document.getElementById('entregasHoy');
+  if (!entregasHoy.length) {
+    listaEntregadas.innerHTML = '<div class="empty"><div class="icon">📦</div><div>No hay entregas realizadas hoy</div></div>';
+  } else {
+    listaEntregadas.innerHTML = `<table>
+      <thead><tr>
+        <th>Cliente</th>
+        <th>Total</th>
+        <th>Estatus Pago</th>
+        <th>Método</th>
+        <th>Hora</th>
+        <th style="text-align:center">Acciones</th>
+      </tr></thead>
+      <tbody>
+        ${entregasHoy.reverse().map(s => `<tr>
+          <td><strong>${s.customer}</strong></td>
+          <td>${fmt(s.total)}</td>
+          <td>
+            <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
+              ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+            </span>
+          </td>
+          <td>
+            <span class="tag" style="background:${s.paymentMethod === 'efectivo' ? '#ecfdf5' : '#ecfeff'};color:${s.paymentMethod === 'efectivo' ? '#16a34a' : '#0891b2'}">
+              ${s.paymentMethod === 'efectivo' ? '💵 Efectivo' : '💳 Transfer'}
+            </span>
+          </td>
+          <td style="font-size:12px;color:var(--muted)">${new Date(s.deliveryDate || s.date).toLocaleTimeString('es-MX')}</td>
+          <td style="text-align:center">
+            <button class="btn btn-ghost btn-sm" onclick="enviarWhatsAppEntrega('${s.id}')" style="background:var(--green-light);color:var(--green);margin-right:4px">
+              📲 WhatsApp
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="deshacerEntrega('${s.id}')" style="background:#fee;color:#dc2626" title="Regresar a pendientes">
+              ↩️ Deshacer
+            </button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  }
+}
+
+function deshacerEntrega(saleId) {
+  if (!confirm('¿Regresar esta entrega a pendientes?\n\nEsto deshará la confirmación de entrega.')) return;
+  
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) return;
+  
+  sale.deliveryStatus = 'no_entregado';
+  sale.deliveryDate = null;
+  
+  saveAll();
+  toast('↩️ Entrega regresada a pendientes');
+  renderEntrega();
 }
 
 function enviarWhatsAppEntrega(saleId) {

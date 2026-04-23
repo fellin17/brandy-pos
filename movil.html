@@ -400,8 +400,13 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
     <span class="sub">Confirma entrega y estatus de pago</span>
   </button>
 
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title" style="background:var(--orange-light);color:var(--orange)">📦 Pendientes de Entrega</div>
+    <div id="entregasPendientesMob"></div>
+  </div>
+
   <div class="card">
-    <div class="card-title">📋 Entregas de hoy</div>
+    <div class="card-title" style="background:var(--green-light);color:var(--green)">✅ Entregas Realizadas Hoy</div>
     <div id="entregasHoyMob"></div>
   </div>
 </div>
@@ -1746,36 +1751,81 @@ let _entregaSaleMob = null;
 
 function renderEntregaMob() {
   const hoy = new Date().toDateString();
+  
+  // Pendientes de entrega (todas las que no se han entregado)
+  const pendientes = sales.filter(s => s.deliveryStatus !== 'entregado');
+  
+  // Entregas realizadas hoy
   const entregasHoy = sales.filter(s => {
     return s.deliveryStatus === 'entregado' && new Date(s.date).toDateString() === hoy;
   });
 
-  const lista = document.getElementById('entregasHoyMob');
-  if (!entregasHoy.length) {
-    lista.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">No hay entregas registradas hoy</div>';
-    return;
+  // Renderizar pendientes
+  const listaPendientes = document.getElementById('entregasPendientesMob');
+  if (!pendientes.length) {
+    listaPendientes.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">✅ No hay entregas pendientes</div>';
+  } else {
+    listaPendientes.innerHTML = pendientes.reverse().map(s => `
+      <div style="padding:12px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="font-size:14px">${s.customer}</strong>
+          <strong style="color:var(--accent);font-size:15px">$${s.total.toFixed(2)}</strong>
+        </div>
+        <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap">
+          <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
+            ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+          </span>
+          <span style="color:var(--muted)">${new Date(s.date).toLocaleDateString('es-MX')} ${new Date(s.date).toLocaleTimeString('es-MX')}</span>
+        </div>
+      </div>
+    `).join('');
   }
 
-  lista.innerHTML = entregasHoy.reverse().map(s => `
-    <div style="padding:12px;border-bottom:1px solid var(--border)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <strong style="font-size:14px">${s.customer}</strong>
-        <strong style="color:var(--accent);font-size:15px">$${s.total.toFixed(2)}</strong>
+  // Renderizar entregas realizadas hoy
+  const listaEntregadas = document.getElementById('entregasHoyMob');
+  if (!entregasHoy.length) {
+    listaEntregadas.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">📦 No hay entregas realizadas hoy</div>';
+  } else {
+    listaEntregadas.innerHTML = entregasHoy.reverse().map(s => `
+      <div style="padding:12px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="font-size:14px">${s.customer}</strong>
+          <strong style="color:var(--accent);font-size:15px">$${s.total.toFixed(2)}</strong>
+        </div>
+        <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap;align-items:center">
+          <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
+            ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+          </span>
+          <span class="tag" style="background:${s.paymentMethod === 'efectivo' ? '#ecfdf5' : '#ecfeff'};color:${s.paymentMethod === 'efectivo' ? '#16a34a' : '#0891b2'}">
+            ${s.paymentMethod === 'efectivo' ? '💵 Efectivo' : '💳 Transfer'}
+          </span>
+          <span style="color:var(--muted)">${new Date(s.deliveryDate || s.date).toLocaleTimeString('es-MX')}</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button onclick="enviarWhatsAppEntregaMob('${s.id}')" style="flex:1;background:var(--green-light);color:var(--green);border:1px solid var(--green);border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700">
+            📲 WhatsApp
+          </button>
+          <button onclick="deshacerEntregaMob('${s.id}')" style="flex:1;background:#fee;color:#dc2626;border:1px solid #dc2626;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700">
+            ↩️ Deshacer
+          </button>
+        </div>
       </div>
-      <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap;align-items:center">
-        <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
-          ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
-        </span>
-        <span class="tag" style="background:${s.paymentMethod === 'efectivo' ? '#ecfdf5' : '#ecfeff'};color:${s.paymentMethod === 'efectivo' ? '#16a34a' : '#0891b2'}">
-          ${s.paymentMethod === 'efectivo' ? '💵 Efectivo' : '💳 Transfer'}
-        </span>
-        <span style="color:var(--muted)">${new Date(s.deliveryDate || s.date).toLocaleTimeString('es-MX')}</span>
-        <button onclick="enviarWhatsAppEntregaMob('${s.id}')" style="background:var(--green-light);color:var(--green);border:1px solid var(--green);border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;margin-left:auto">
-          📲 WhatsApp
-        </button>
-      </div>
-    </div>
-  `).join('');
+    `).join('');
+  }
+}
+
+function deshacerEntregaMob(saleId) {
+  if (!confirm('¿Regresar esta entrega a pendientes?\n\nEsto deshará la confirmación de entrega.')) return;
+  
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) return;
+  
+  sale.deliveryStatus = 'no_entregado';
+  sale.deliveryDate = null;
+  
+  saveData();
+  toast('↩️ Entrega regresada a pendientes');
+  renderEntregaMob();
 }
 
 function enviarWhatsAppEntregaMob(saleId) {
