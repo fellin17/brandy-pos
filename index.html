@@ -467,6 +467,24 @@ return QRCode;
         <div id="finanzasDesglose"></div>
       </div>
 
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">💸 Registrar Gasto</div>
+        <div style="padding:16px">
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input type="text" id="expenseConcept" placeholder="Concepto (ej: Comida, Gasolina)" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+            <input type="number" id="expenseAmount" placeholder="Cantidad" step="0.01" style="width:120px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+            <button class="btn btn-primary" onclick="addExpense()" style="white-space:nowrap">➕ Agregar</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted)">Los gastos se restan automáticamente del total</div>
+        </div>
+        <div id="finanzasGastosList"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">📦 Pendientes de Entrega</div>
+        <div id="finanzasPendientesEntrega"></div>
+      </div>
+
       <div class="card">
         <div class="card-header">📊 Ventas Pendientes de Pago</div>
         <div id="finanzasPendientes"></div>
@@ -951,7 +969,7 @@ const DB = {
 };
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
-let products = [], sales = [], cuts = [];
+let products = [], sales = [], cuts = [], expenses = [];
 let cfg = {
   bizName:'MI NEGOCIO', phone:'', address:'', rfc:'',
   msg:'¡Gracias por su compra! Vuelva pronto 😊',
@@ -968,7 +986,7 @@ let cfg = {
 let cart = [], editProdId = null;
 let cartDiscount = 0; // porcentaje de descuento (0-100)
 
-function saveAll() { DB.save({ products, sales, cuts, cfg }); }
+function saveAll() { DB.save({ products, sales, cuts, cfg, expenses }); }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 async function init() {
@@ -996,6 +1014,7 @@ async function init() {
     products = data.products || products;
     sales    = data.sales    || sales;
     cuts     = data.cuts     || cuts;
+    expenses = data.expenses || expenses;
     cfg      = { ...cfg, ...(data.cfg || {}) };
     updateHeader(); loadSettings(); renderInventory(); renderCut(); renderHistory();
     updateConnectionStatus('online');
@@ -1007,6 +1026,7 @@ async function init() {
     products = data.products || products;
     sales    = data.sales    || sales;
     cuts     = data.cuts     || cuts;
+    expenses = data.expenses || expenses;
     cfg      = { ...cfg, ...(data.cfg || {}) };
     updateHeader(); renderInventory(); renderCut(); renderHistory();
     updateConnectionStatus('online');
@@ -1176,7 +1196,7 @@ function addToCart(id) {
     if (ex.qty >= p.stock) { toast('No hay más stock disponible', 'error'); return; }
     ex.qty++;
   } else {
-    cart.push({ id: p.id, name: p.name, buyPrice: p.buyPrice, sellPrice: p.sellPrice, qty: 1, stock: p.stock });
+    cart.unshift({ id: p.id, name: p.name, buyPrice: p.buyPrice, sellPrice: p.sellPrice, qty: 1, stock: p.stock });
   }
   document.getElementById('posSearch').value = '';
   document.getElementById('searchResults').style.display = 'none';
@@ -2446,22 +2466,32 @@ function generarReportePC(tipo) {
   let data, labels, titulo;
 
   if (tipo === 'semanal') {
-    // Últimos 7 días
-    const dias = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      dias.push({
-        fecha: d.toDateString(),
-        label: d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
+    // Últimas 4 semanas
+    const semanas = [];
+    for (let i = 3; i >= 0; i--) {
+      const finSemana = new Date(now);
+      finSemana.setDate(finSemana.getDate() - (i * 7));
+      const inicioSemana = new Date(finSemana);
+      inicioSemana.setDate(inicioSemana.getDate() - 6);
+      
+      semanas.push({
+        inicio: inicioSemana.toDateString(),
+        fin: finSemana.toDateString(),
+        label: `Semana ${4-i}`
       });
     }
-    data = dias.map(dia => {
-      const ventasDia = sales.filter(s => new Date(s.date).toDateString() === dia.fecha);
-      return ventasDia.reduce((sum, s) => sum + s.total, 0);
+    data = semanas.map(semana => {
+      const ventasSemana = sales.filter(s => {
+        const fecha = new Date(s.date).toDateString();
+        const inicio = new Date(semana.inicio);
+        const fin = new Date(semana.fin);
+        const fechaSale = new Date(fecha);
+        return fechaSale >= inicio && fechaSale <= fin;
+      });
+      return ventasSemana.reduce((sum, s) => sum + s.total, 0);
     });
-    labels = dias.map(d => d.label);
-    titulo = '📅 Reporte Semanal — Últimos 7 días';
+    labels = semanas.map(d => d.label);
+    titulo = '📅 Reporte Semanal — Últimas 4 semanas';
   } else if (tipo === 'mensual') {
     // Últimos 6 meses
     const meses = [];
@@ -2498,7 +2528,7 @@ function generarReportePC(tipo) {
 
   // Calcular estadísticas
   const ventasPeriodo = tipo === 'semanal'
-    ? sales.filter(s => (now - new Date(s.date)) / (1000 * 60 * 60 * 24) <= 7)
+    ? sales.filter(s => (now - new Date(s.date)) / (1000 * 60 * 60 * 24) <= 28)
     : tipo === 'mensual'
     ? sales.filter(s => (now - new Date(s.date)) / (1000 * 60 * 60 * 24) <= 180)
     : sales.filter(s => (now - new Date(s.date)) / (1000 * 60 * 60 * 24) <= 1095);
@@ -2839,23 +2869,23 @@ function confirmarEntrega() {
 
   saveAll();
 
-  // Crear mensaje de WhatsApp
-  const statusPago = _entregaPaymentStatus === 'pagado' ? '✅ PAGADO' : '⏳ PENDIENTE DE PAGO';
-  const msg = `🤖✨ CONFIRMACIÓN AUTOMÁTICA DE OPERACIÓN
+  // Crear mensaje de WhatsApp con formato
+  const statusPago = _entregaPaymentStatus === 'pagado' ? '*✅ PAGADO*' : '*⏳ PENDIENTE DE PAGO*';
+  const msg = `🤖✨ *CONFIRMACIÓN AUTOMÁTICA DE OPERACIÓN*
 ━━━━━━━━━━━━━━━
-💳 ESTATUS DE PAGO: ${statusPago}
-📦 ESTATUS DE ENTREGA: ✅ ENTREGADO
+💳 *ESTATUS DE PAGO:* ${statusPago}
+📦 *ESTATUS DE ENTREGA:* *✅ ENTREGADO*
 ━━━━━━━━━━━━━━━
-🧾 PROCESO COMPLETADO EXITOSAMENTE
-📊 La operación ha sido registrada correctamente en nuestro sistema.
+🧾 *PROCESO COMPLETADO EXITOSAMENTE*
+📊 _La operación ha sido registrada correctamente en nuestro sistema._
 
-💖 ¡GRACIAS POR TU COMPRA!
-Tu confianza significa mucho para nosotros. Es un gusto poder atenderte. 🫶
+💖 *¡GRACIAS POR TU COMPRA!*
+_Tu confianza significa mucho para nosotros. Es un gusto poder atenderte._ 🫶
 
 ━━━━━━━━━━━━━━━
-🌷 Te deseamos un día lleno de cosas bonitas,
-✨ alegría, bienestar y momentos felices.
-😊 ¡Gracias por formar parte de nuestra comunidad!`;
+🌷 _Te deseamos un día lleno de cosas bonitas,_
+✨ _alegría, bienestar y momentos felices._
+😊 *¡Gracias por formar parte de nuestra comunidad!*`;
 
   closeEntregaModal();
   toast(`✅ Entrega confirmada - ${sale.customer}`);
@@ -2888,7 +2918,15 @@ function renderFinanzas() {
     .filter(s => s.paymentStatus === 'pendiente')
     .reduce((sum, s) => sum + s.total, 0);
 
+  // Gastos del día
+  const gastosHoy = expenses.filter(e => {
+    const hoy = new Date().toDateString();
+    return new Date(e.date).toDateString() === hoy;
+  });
+  const totalGastos = gastosHoy.reduce((sum, e) => sum + e.amount, 0);
+
   const totalGeneral = totalEfectivo + totalTransferencia;
+  const totalFinal = totalGeneral - totalGastos;
 
   // Stats
   document.getElementById('finanzasStats').innerHTML = `
@@ -2931,16 +2969,25 @@ function renderFinanzas() {
           ${ventasHoy.filter(s => s.paymentStatus === 'pagado' && s.paymentMethod === 'transferencia').length} ventas
         </div>
       </div>
+      <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-weight:700;font-size:14px;color:#dc2626">💸 Gastos</span>
+          <span style="font-weight:800;font-size:16px;color:#dc2626">-${fmt(totalGastos)}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">
+          ${gastosHoy.length} gastos registrados
+        </div>
+      </div>
       <div style="border-top:2px solid var(--border);padding-top:16px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-weight:800;font-size:15px">TOTAL QUE DEBES TENER</span>
-          <span style="font-weight:900;font-size:20px;color:var(--green)">${fmt(totalGeneral)}</span>
+          <span style="font-weight:900;font-size:20px;color:var(--green)">${fmt(totalFinal)}</span>
         </div>
       </div>
     </div>
   `;
 
-  // Pendientes
+  // Pendientes de pago
   const pendientes = ventasHoy.filter(s => s.paymentStatus === 'pendiente');
   const divPendientes = document.getElementById('finanzasPendientes');
   
@@ -2962,6 +3009,88 @@ function renderFinanzas() {
       </tbody>
     </table>`;
   }
+
+  // Pendientes de entrega
+  const pendientesEntrega = ventasHoy.filter(s => s.deliveryStatus !== 'entregado');
+  const divPendientesEntrega = document.getElementById('finanzasPendientesEntrega');
+  
+  if (!pendientesEntrega.length) {
+    divPendientesEntrega.innerHTML = '<div class="empty"><div class="icon">📦</div><div>Todas las ventas han sido entregadas</div></div>';
+  } else {
+    divPendientesEntrega.innerHTML = `<table>
+      <thead><tr>
+        <th>Cliente</th>
+        <th style="text-align:right">Total</th>
+        <th>Estatus Pago</th>
+      </tr></thead>
+      <tbody>
+        ${pendientesEntrega.map(s => `<tr>
+          <td><strong>${s.customer}</strong></td>
+          <td style="text-align:right;font-weight:700">${fmt(s.total)}</td>
+          <td>
+            <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
+              ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+            </span>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  }
+
+  // Lista de gastos
+  const divGastos = document.getElementById('finanzasGastosList');
+  if (!gastosHoy.length) {
+    divGastos.innerHTML = '<div class="empty"><div class="icon">💰</div><div>No hay gastos registrados hoy</div></div>';
+  } else {
+    divGastos.innerHTML = `<table>
+      <thead><tr>
+        <th>Concepto</th>
+        <th style="text-align:right">Cantidad</th>
+        <th style="text-align:right">Acciones</th>
+      </tr></thead>
+      <tbody>
+        ${gastosHoy.map(e => `<tr>
+          <td>${e.concept}</td>
+          <td style="text-align:right;font-weight:700;color:#dc2626">${fmt(e.amount)}</td>
+          <td style="text-align:right">
+            <button class="btn btn-ghost btn-sm" onclick="deleteExpense('${e.id}')" style="color:#dc2626">🗑️</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  }
+}
+
+function addExpense() {
+  const concept = document.getElementById('expenseConcept').value.trim();
+  const amount = parseFloat(document.getElementById('expenseAmount').value);
+  
+  if (!concept) { toast('Escribe un concepto para el gasto', 'error'); return; }
+  if (!amount || amount <= 0) { toast('Ingresa una cantidad válida', 'error'); return; }
+  
+  const expense = {
+    id: Date.now().toString(),
+    date: new Date().toISOString(),
+    concept: concept,
+    amount: amount
+  };
+  
+  expenses.push(expense);
+  saveAll();
+  
+  document.getElementById('expenseConcept').value = '';
+  document.getElementById('expenseAmount').value = '';
+  
+  toast('✅ Gasto registrado');
+  renderFinanzas();
+}
+
+function deleteExpense(id) {
+  if (!confirm('¿Eliminar este gasto?')) return;
+  expenses = expenses.filter(e => e.id !== id);
+  saveAll();
+  toast('🗑️ Gasto eliminado');
+  renderFinanzas();
 }
 
 // ─── SETTINGS ─────────────────────────────────────────────────────────────────
