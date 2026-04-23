@@ -1762,7 +1762,7 @@ function renderEntregaMob() {
         <strong style="font-size:14px">${s.customer}</strong>
         <strong style="color:var(--accent);font-size:15px">$${s.total.toFixed(2)}</strong>
       </div>
-      <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap;align-items:center">
         <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
           ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
         </span>
@@ -1770,9 +1770,40 @@ function renderEntregaMob() {
           ${s.paymentMethod === 'efectivo' ? '💵 Efectivo' : '💳 Transfer'}
         </span>
         <span style="color:var(--muted)">${new Date(s.deliveryDate || s.date).toLocaleTimeString('es-MX')}</span>
+        <button onclick="enviarWhatsAppEntregaMob('${s.id}')" style="background:var(--green-light);color:var(--green);border:1px solid var(--green);border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;margin-left:auto">
+          📲 WhatsApp
+        </button>
       </div>
     </div>
   `).join('');
+}
+
+function enviarWhatsAppEntregaMob(saleId) {
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) return;
+  
+  const statusPago = sale.paymentStatus === 'pagado' ? '*✅ PAGADO*' : '*⏳ PENDIENTE DE PAGO*';
+  const msg = `🤖✨ *CONFIRMACIÓN AUTOMÁTICA DE OPERACIÓN*
+━━━━━━━━━━━━━━━
+💳 *ESTATUS DE PAGO:* ${statusPago}
+📦 *ESTATUS DE ENTREGA:* *✅ ENTREGADO*
+━━━━━━━━━━━━━━━
+🧾 *PROCESO COMPLETADO EXITOSAMENTE*
+📊 _La operación ha sido registrada correctamente en nuestro sistema._
+
+💖 *¡GRACIAS POR TU COMPRA!*
+_Tu confianza significa mucho para nosotros. Es un gusto poder atenderte._ 🫶
+
+━━━━━━━━━━━━━━━
+🌷 _Te deseamos un día lleno de cosas bonitas,_
+✨ _alegría, bienestar y momentos felices._
+😊 *¡Gracias por formar parte de nuestra comunidad!*`;
+
+  if (sale.phone) {
+    window.location.href = `whatsapp://send?phone=52${sale.phone}&text=${encodeURIComponent(msg)}`;
+  } else {
+    window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+  }
 }
 
 function openScannerEntregaMob() {
@@ -1845,7 +1876,12 @@ _Tu confianza significa mucho para nosotros. Es un gusto poder atenderte._ 🫶
   renderEntregaMob();
   _entregaSaleMob = null;
 
-  window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+  // Enviar WhatsApp con el número de la clienta si existe
+  if (sale.phone) {
+    window.location.href = `whatsapp://send?phone=52${sale.phone}&text=${encodeURIComponent(msg)}`;
+  } else {
+    window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+  }
 }
 
 // ─── FINANZAS MÓVIL ───────────────────────────────────────────────────────────

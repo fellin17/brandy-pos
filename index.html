@@ -2727,6 +2727,7 @@ function renderEntrega() {
       <th>Estatus Pago</th>
       <th>Método</th>
       <th>Hora</th>
+      <th style="text-align:center">Acción</th>
     </tr></thead>
     <tbody>
       ${entregasHoy.reverse().map(s => `<tr>
@@ -2743,9 +2744,42 @@ function renderEntrega() {
           </span>
         </td>
         <td style="font-size:12px;color:var(--muted)">${new Date(s.deliveryDate || s.date).toLocaleTimeString('es-MX')}</td>
+        <td style="text-align:center">
+          <button class="btn btn-ghost btn-sm" onclick="enviarWhatsAppEntrega('${s.id}')" style="background:var(--green-light);color:var(--green)">
+            📲 WhatsApp
+          </button>
+        </td>
       </tr>`).join('')}
     </tbody>
   </table>`;
+}
+
+function enviarWhatsAppEntrega(saleId) {
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) return;
+  
+  const statusPago = sale.paymentStatus === 'pagado' ? '*✅ PAGADO*' : '*⏳ PENDIENTE DE PAGO*';
+  const msg = `🤖✨ *CONFIRMACIÓN AUTOMÁTICA DE OPERACIÓN*
+━━━━━━━━━━━━━━━
+💳 *ESTATUS DE PAGO:* ${statusPago}
+📦 *ESTATUS DE ENTREGA:* *✅ ENTREGADO*
+━━━━━━━━━━━━━━━
+🧾 *PROCESO COMPLETADO EXITOSAMENTE*
+📊 _La operación ha sido registrada correctamente en nuestro sistema._
+
+💖 *¡GRACIAS POR TU COMPRA!*
+_Tu confianza significa mucho para nosotros. Es un gusto poder atenderte._ 🫶
+
+━━━━━━━━━━━━━━━
+🌷 _Te deseamos un día lleno de cosas bonitas,_
+✨ _alegría, bienestar y momentos felices._
+😊 *¡Gracias por formar parte de nuestra comunidad!*`;
+
+  if (sale.phone) {
+    window.location.href = `whatsapp://send?phone=52${sale.phone}&text=${encodeURIComponent(msg)}`;
+  } else {
+    window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+  }
 }
 
 function openScannerEntrega() {
