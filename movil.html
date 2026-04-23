@@ -417,6 +417,24 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
     <div id="finanzasDesgloseMob"></div>
   </div>
 
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">💸 Registrar Gasto</div>
+    <div style="padding:12px">
+      <input type="text" id="expenseConceptMob" placeholder="Concepto (ej: Comida)" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:8px">
+      <div style="display:flex;gap:8px">
+        <input type="number" id="expenseAmountMob" placeholder="Cantidad" step="0.01" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+        <button onclick="addExpenseMob()" style="background:var(--primary);color:white;border:none;border-radius:6px;padding:10px 16px;font-weight:700;font-size:13px">➕</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">Los gastos se restan del total</div>
+    </div>
+    <div id="finanzasGastosMob"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">📦 Pendientes de Entrega</div>
+    <div id="finanzasPendientesEntregaMob"></div>
+  </div>
+
   <div class="card">
     <div class="card-title">⏳ Ventas Pendientes de Pago</div>
     <div id="finanzasPendientesMob"></div>
@@ -451,7 +469,7 @@ try {
 } catch(e) { console.warn('Firebase:', e.message); }
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
-let products = [], sales = [], cuts = [], cfg = { bizName: 'Brandy POS' };
+let products = [], sales = [], cuts = [], expenses = [], cfg = { bizName: 'Brandy POS' };
 let cart = [];
 
 // ─── LOAD DATA ────────────────────────────────────────────────────────────────
@@ -497,6 +515,7 @@ function applyData(data) {
   products = data.products || [];
   sales    = data.sales    || [];
   cuts     = data.cuts     || [];
+  expenses = data.expenses || [];
   if (data.cfg) cfg = { ...cfg, ...data.cfg };
   document.getElementById('hdrName').textContent = cfg.bizName || 'Brandy POS';
   renderInventario();
@@ -505,7 +524,7 @@ function applyData(data) {
 }
 
 async function saveData() {
-  const data = { products, sales, cuts, cfg };
+  const data = { products, sales, cuts, expenses, cfg };
   try { localStorage.setItem('pos_backup', JSON.stringify(data)); } catch {}
   if (fbReady) fbDoc.set(data).catch(() => {});
 }
@@ -868,7 +887,7 @@ function addToCartMobile(id) {
     if (ex.qty >= p.stock) { toast('No hay más stock', 'error'); return; }
     ex.qty++;
   } else {
-    cart.push({ id: p.id, name: p.name, buyPrice: p.buyPrice, sellPrice: p.sellPrice, qty: 1, stock: p.stock });
+    cart.unshift({ id: p.id, name: p.name, buyPrice: p.buyPrice, sellPrice: p.sellPrice, qty: 1, stock: p.stock });
   }
 
   document.getElementById('ventaSearch').value = '';
@@ -1804,22 +1823,22 @@ function confirmarEntregaMob(paymentStatus, paymentMethod) {
 
   saveData();
 
-  const statusPago = paymentStatus === 'pagado' ? '✅ PAGADO' : '⏳ PENDIENTE DE PAGO';
-  const msg = `🤖✨ CONFIRMACIÓN AUTOMÁTICA DE OPERACIÓN
+  const statusPago = paymentStatus === 'pagado' ? '*✅ PAGADO*' : '*⏳ PENDIENTE DE PAGO*';
+  const msg = `🤖✨ *CONFIRMACIÓN AUTOMÁTICA DE OPERACIÓN*
 ━━━━━━━━━━━━━━━
-💳 ESTATUS DE PAGO: ${statusPago}
-📦 ESTATUS DE ENTREGA: ✅ ENTREGADO
+💳 *ESTATUS DE PAGO:* ${statusPago}
+📦 *ESTATUS DE ENTREGA:* *✅ ENTREGADO*
 ━━━━━━━━━━━━━━━
-🧾 PROCESO COMPLETADO EXITOSAMENTE
-📊 La operación ha sido registrada correctamente en nuestro sistema.
+🧾 *PROCESO COMPLETADO EXITOSAMENTE*
+📊 _La operación ha sido registrada correctamente en nuestro sistema._
 
-💖 ¡GRACIAS POR TU COMPRA!
-Tu confianza significa mucho para nosotros. Es un gusto poder atenderte. 🫶
+💖 *¡GRACIAS POR TU COMPRA!*
+_Tu confianza significa mucho para nosotros. Es un gusto poder atenderte._ 🫶
 
 ━━━━━━━━━━━━━━━
-🌷 Te deseamos un día lleno de cosas bonitas,
-✨ alegría, bienestar y momentos felices.
-😊 ¡Gracias por formar parte de nuestra comunidad!`;
+🌷 _Te deseamos un día lleno de cosas bonitas,_
+✨ _alegría, bienestar y momentos felices._
+😊 *¡Gracias por formar parte de nuestra comunidad!*`;
 
   toast(`✅ Entrega confirmada - ${sale.customer}`);
   renderEntregaMob();
@@ -1847,7 +1866,15 @@ function renderFinanzasMob() {
     .filter(s => s.paymentStatus === 'pendiente')
     .reduce((sum, s) => sum + s.total, 0);
 
+  // Gastos del día
+  const gastosHoy = expenses.filter(e => {
+    const hoy = new Date().toDateString();
+    return new Date(e.date).toDateString() === hoy;
+  });
+  const totalGastos = gastosHoy.reduce((sum, e) => sum + e.amount, 0);
+
   const totalGeneral = totalEfectivo + totalTransferencia;
+  const totalFinal = totalGeneral - totalGastos;
 
   // Stats
   document.getElementById('finanzasStatsMob').innerHTML = `
@@ -1872,16 +1899,62 @@ function renderFinanzasMob() {
   // Desglose
   document.getElementById('finanzasDesgloseMob').innerHTML = `
     <div style="padding:14px">
-      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:2px solid var(--border)">
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-weight:700;font-size:13px;color:#dc2626">💸 Gastos</span>
+          <span style="font-weight:800;font-size:15px;color:#dc2626">-$${totalGastos.toFixed(2)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted)">${gastosHoy.length} gastos registrados</div>
+      </div>
+      <div style="padding-bottom:14px;border-bottom:2px solid var(--border)">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-weight:800;font-size:15px">TOTAL QUE DEBES TENER</span>
-          <span style="font-weight:900;font-size:22px;color:var(--green)">$${totalGeneral.toFixed(2)}</span>
+          <span style="font-weight:900;font-size:22px;color:var(--green)">$${totalFinal.toFixed(2)}</span>
         </div>
       </div>
     </div>
   `;
 
-  // Pendientes
+  // Gastos
+  const divGastos = document.getElementById('finanzasGastosMob');
+  if (!gastosHoy.length) {
+    divGastos.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">💰 No hay gastos registrados hoy</div>';
+  } else {
+    divGastos.innerHTML = gastosHoy.map(e => `
+      <div style="padding:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:13px">${e.concept}</div>
+          <div style="font-size:11px;color:var(--muted)">${new Date(e.date).toLocaleTimeString('es-MX')}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:800;color:#dc2626;font-size:15px">$${e.amount.toFixed(2)}</span>
+          <button onclick="deleteExpenseMob('${e.id}')" style="background:none;border:none;font-size:18px;cursor:pointer">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Pendientes de entrega
+  const pendientesEntrega = ventasHoy.filter(s => s.deliveryStatus !== 'entregado');
+  const divPendEntrega = document.getElementById('finanzasPendientesEntregaMob');
+  
+  if (!pendientesEntrega.length) {
+    divPendEntrega.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">📦 Todas las ventas han sido entregadas</div>';
+  } else {
+    divPendEntrega.innerHTML = pendientesEntrega.map(s => `
+      <div style="padding:12px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="font-size:14px">${s.customer}</strong>
+          <strong style="font-size:15px">$${s.total.toFixed(2)}</strong>
+        </div>
+        <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}" style="font-size:11px">
+          ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+        </span>
+      </div>
+    `).join('');
+  }
+
+  // Pendientes de pago
   const pendientes = ventasHoy.filter(s => s.paymentStatus === 'pendiente');
   const divPend = document.getElementById('finanzasPendientesMob');
   
@@ -1898,6 +1971,38 @@ function renderFinanzasMob() {
       </div>
     `).join('');
   }
+}
+
+function addExpenseMob() {
+  const concept = document.getElementById('expenseConceptMob').value.trim();
+  const amount = parseFloat(document.getElementById('expenseAmountMob').value);
+  
+  if (!concept) { toast('Escribe un concepto', 'error'); return; }
+  if (!amount || amount <= 0) { toast('Ingresa una cantidad válida', 'error'); return; }
+  
+  const expense = {
+    id: Date.now().toString(),
+    date: new Date().toISOString(),
+    concept: concept,
+    amount: amount
+  };
+  
+  expenses.push(expense);
+  saveData();
+  
+  document.getElementById('expenseConceptMob').value = '';
+  document.getElementById('expenseAmountMob').value = '';
+  
+  toast('✅ Gasto registrado');
+  renderFinanzasMob();
+}
+
+function deleteExpenseMob(id) {
+  if (!confirm('¿Eliminar este gasto?')) return;
+  expenses = expenses.filter(e => e.id !== id);
+  saveData();
+  toast('🗑️ Gasto eliminado');
+  renderFinanzasMob();
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
