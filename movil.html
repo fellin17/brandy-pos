@@ -480,6 +480,17 @@ let isOnline = navigator.onLine;
 let pendingSync = false;
 let lastSyncTime = Date.now();
 
+// ─── SISTEMA DE CAJA ACUMULADA ────────────────────────────────────────────────
+let cashRegister = {
+  totalAcumulado: 0,
+  efectivoAcumulado: 0,
+  transferenciaAcumulado: 0,
+  gastosAcumulados: 0,
+  fechaInicio: new Date().toISOString(),
+  ultimoCorte: null,
+  historialCortes: []
+};
+
 // ─── OFFLINE/ONLINE DETECTION ─────────────────────────────────────────────────
 window.addEventListener('online', () => {
   isOnline = true;
@@ -567,6 +578,9 @@ function applyData(data) {
   cuts     = data.cuts     || [];
   expenses = data.expenses || [];
   if (data.cfg) cfg = { ...cfg, ...data.cfg };
+  if (data.cashRegister) {
+    cashRegister = { ...cashRegister, ...data.cashRegister };
+  }
   document.getElementById('hdrName').textContent = cfg.bizName || 'Brandy POS';
   renderInventario();
   renderNotas();
@@ -586,6 +600,7 @@ async function saveData() {
     cuts, 
     expenses, 
     cfg,
+    cashRegister,
     lastUpdate: Date.now()
   };
   
@@ -2147,6 +2162,26 @@ function confirmarEntregaMob(paymentStatus, paymentMethod) {
   sale.paymentStatus = paymentStatus;
   sale.paymentMethod = paymentMethod;
 
+  // Actualizar caja acumulada si está pagado
+  if (paymentStatus === 'pagado') {
+    cashRegister.totalAcumulado += sale.total;
+    if (paymentMethod === 'efectivo') {
+      cashRegister.efectivoAcumulado += sale.total;
+    } else if (paymentMethod === 'transferencia') {
+      cashRegister.transferenciaAcumulado += sale.total;
+    }
+  } else if (sale.payments && sale.payments.length > 0) {
+    // Si hay pagos parciales, sumarlos
+    sale.payments.forEach(p => {
+      cashRegister.totalAcumulado += p.amount;
+      if (p.method === 'efectivo') {
+        cashRegister.efectivoAcumulado += p.amount;
+      } else {
+        cashRegister.transferenciaAcumulado += p.amount;
+      }
+    });
+  }
+
   saveData();
 
   const statusPago = paymentStatus === 'pagado' ? '*✅ PAGADO*' : '*⏳ PENDIENTE DE PAGO*';
@@ -2167,41 +2202,55 @@ _Tu confianza significa mucho para nosotros. Es un gusto poder atenderte._ 🫶
 😊 *¡Gracias por formar parte de nuestra comunidad!*`;
 
   toast(`✅ Entrega confirmada - ${sale.customer}`);
-  renderEntregaMob();
+  
+  // Guardar referencia antes de limpiar
+  const phoneNumber = sale.phone;
+  
+  // Limpiar y actualizar UI
   _entregaSaleMob = null;
-
-  // Enviar WhatsApp con el número de la clienta si existe
-  if (sale.phone) {
-    window.location.href = `whatsapp://send?phone=52${sale.phone}&text=${encodeURIComponent(msg)}`;
-  } else {
-    window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+  renderEntregaMob();
+  if (document.getElementById('tab-finanzas').style.display !== 'none') {
+    renderFinanzasMob();
   }
+
+  // IMPORTANTE: Enviar WhatsApp AL FINAL
+  setTimeout(() => {
+    if (phoneNumber) {
+      window.location.href = `whatsapp://send?phone=52${phoneNumber}&text=${encodeURIComponent(msg)}`;
+    } else {
+      window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+    }
+  }, 100);
 }
 
 // ─── FINANZAS MÓVIL ───────────────────────────────────────────────────────────
 function renderFinanzasMob() {
   const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0); // Reset to midnight for accurate comparison
+  hoy.setHours(0, 0, 0, 0);
+  
+  // ENTREGAS confirmadas hoy + VENTAS de hoy
+  const entregasHoy = sales.filter(s => {
+    if (!s.deliveryDate) return false;
+    const deliveryDate = new Date(s.deliveryDate);
+    deliveryDate.setHours(0, 0, 0, 0);
+    return deliveryDate.getTime() === hoy.getTime();
+  });
   
   const ventasHoy = sales.filter(s => {
     const saleDate = new Date(s.date);
     saleDate.setHours(0, 0, 0, 0);
     return saleDate.getTime() === hoy.getTime();
   });
-
-  console.log('🔍 FINANZAS DEBUG:');
-  console.log('Total ventas:', sales.length);
-  console.log('Ventas de hoy:', ventasHoy.length);
-  console.log('Fecha hoy:', hoy.toDateString());
   
-  // Calcular totales con pagos parciales incluidos
-  const totalEfectivo = ventasHoy
+  const ventasYEntregasHoy = [...new Set([...ventasHoy, ...entregasHoy])];
+
+  // Calcular totales DEL DÍA
+  const totalEfectivoHoy = ventasYEntregasHoy
     .filter(s => s.paymentMethod === 'efectivo')
     .reduce((sum, s) => {
       if (s.paymentStatus === 'pagado') {
         return sum + s.total;
       } else if (s.payments && s.payments.length > 0) {
-        // Sumar abonos en efectivo
         const abonosEfectivo = s.payments
           .filter(p => p.method === 'efectivo')
           .reduce((a, p) => a + p.amount, 0);
@@ -2210,13 +2259,12 @@ function renderFinanzasMob() {
       return sum;
     }, 0);
 
-  const totalTransferencia = ventasHoy
+  const totalTransferenciaHoy = ventasYEntregasHoy
     .filter(s => s.paymentMethod === 'transferencia')
     .reduce((sum, s) => {
       if (s.paymentStatus === 'pagado') {
         return sum + s.total;
       } else if (s.payments && s.payments.length > 0) {
-        // Sumar abonos en transferencia
         const abonosTransfer = s.payments
           .filter(p => p.method === 'transferencia')
           .reduce((a, p) => a + p.amount, 0);
@@ -2225,13 +2273,9 @@ function renderFinanzasMob() {
       return sum;
     }, 0);
 
-  const totalPendiente = ventasHoy
+  const totalPendienteHoy = ventasYEntregasHoy
     .filter(s => s.paymentStatus === 'pendiente')
     .reduce((sum, s) => sum + (s.debt || s.total), 0);
-
-  console.log('💵 Efectivo:', totalEfectivo);
-  console.log('💳 Transferencia:', totalTransferencia);
-  console.log('⏳ Pendiente:', totalPendiente);
 
   // Gastos del día
   const gastosHoy = expenses.filter(e => {
@@ -2239,54 +2283,101 @@ function renderFinanzasMob() {
     expenseDate.setHours(0, 0, 0, 0);
     return expenseDate.getTime() === hoy.getTime();
   });
-  const totalGastos = gastosHoy.reduce((sum, e) => sum + e.amount, 0);
+  const totalGastosHoy = gastosHoy.reduce((sum, e) => sum + e.amount, 0);
+  
+  // Actualizar gastos acumulados
+  cashRegister.gastosAcumulados += totalGastosHoy;
 
-  const totalGeneral = totalEfectivo + totalTransferencia;
-  const totalFinal = totalGeneral - totalGastos;
+  const totalGeneralHoy = totalEfectivoHoy + totalTransferenciaHoy;
+  const efectivoEnCaja = cashRegister.efectivoAcumulado - cashRegister.gastosAcumulados;
 
-  console.log('💰 Total general:', totalGeneral);
-  console.log('💸 Gastos:', totalGastos);
-  console.log('✅ Total final:', totalFinal);
+  console.log('🔍 FINANZAS DEBUG:');
+  console.log('💰 Acumulado total:', cashRegister.totalAcumulado);
+  console.log('📊 Hoy:', totalGeneralHoy);
+  console.log('💸 Gastos acumulados:', cashRegister.gastosAcumulados);
+  console.log('💵 Efectivo en caja:', efectivoEnCaja);
 
-  // Stats
+  // Stats - CAJA ACUMULADA
   document.getElementById('finanzasStatsMob').innerHTML = `
-    <div style="background:var(--green-light);border:1.5px solid var(--green);border-radius:10px;padding:12px;text-align:center">
-      <div style="font-size:20px;font-weight:900;color:var(--green)">$${totalGeneral.toFixed(2)}</div>
-      <div style="font-size:11px;color:var(--green);font-weight:700;margin-top:4px">TOTAL RECIBIDO</div>
+    <div style="background:linear-gradient(135deg, #10b981 0%, #059669 100%);border:2px solid #059669;border-radius:12px;padding:16px;text-align:center;margin-bottom:16px">
+      <div style="font-size:12px;color:#d1fae5;font-weight:700;margin-bottom:4px">💰 TOTAL EN CAJA (ACUMULADO)</div>
+      <div style="font-size:28px;font-weight:900;color:white;text-shadow:0 2px 4px rgba(0,0,0,0.2)">$${cashRegister.totalAcumulado.toFixed(2)}</div>
+      <div style="font-size:10px;color:#d1fae5;margin-top:6px">Desde: ${new Date(cashRegister.fechaInicio).toLocaleDateString('es-MX')}</div>
     </div>
-    <div style="background:#ecfdf5;border:1.5px solid #16a34a;border-radius:10px;padding:12px;text-align:center">
-      <div style="font-size:20px;font-weight:900;color:#16a34a">$${totalEfectivo.toFixed(2)}</div>
-      <div style="font-size:11px;color:#16a34a;font-weight:700;margin-top:4px">💵 EFECTIVO</div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="background:#ecfdf5;border:1.5px solid #16a34a;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:18px;font-weight:900;color:#16a34a">$${cashRegister.efectivoAcumulado.toFixed(2)}</div>
+        <div style="font-size:10px;color:#16a34a;font-weight:700;margin-top:4px">💵 EFECTIVO</div>
+      </div>
+      <div style="background:#ecfeff;border:1.5px solid #0891b2;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:18px;font-weight:900;color:#0891b2">$${cashRegister.transferenciaAcumulado.toFixed(2)}</div>
+        <div style="font-size:10px;color:#0891b2;font-weight:700;margin-top:4px">💳 TRANSFER</div>
+      </div>
     </div>
-    <div style="background:#ecfeff;border:1.5px solid #0891b2;border-radius:10px;padding:12px;text-align:center">
-      <div style="font-size:20px;font-weight:900;color:#0891b2">$${totalTransferencia.toFixed(2)}</div>
-      <div style="font-size:11px;color:#0891b2;font-weight:700;margin-top:4px">💳 TRANSFERENCIA</div>
+
+    <div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;color:#92400e;font-weight:700;margin-bottom:8px">📊 VENTAS DE HOY</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:12px;color:#92400e">💵 Efectivo:</span>
+        <span style="font-size:13px;font-weight:700;color:#92400e">$${totalEfectivoHoy.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:12px;color:#92400e">💳 Transfer:</span>
+        <span style="font-size:13px;font-weight:700;color:#92400e">$${totalTransferenciaHoy.toFixed(2)}</span>
+      </div>
+      <div style="border-top:1px solid #fbbf24;margin:8px 0;padding-top:8px">
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:13px;font-weight:700;color:#92400e">TOTAL HOY:</span>
+          <span style="font-size:15px;font-weight:900;color:#f59e0b">$${totalGeneralHoy.toFixed(2)}</span>
+        </div>
+      </div>
     </div>
-    <div style="background:var(--orange-light);border:1.5px solid var(--orange);border-radius:10px;padding:12px;text-align:center">
-      <div style="font-size:20px;font-weight:900;color:var(--orange)">$${totalPendiente.toFixed(2)}</div>
-      <div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:4px">⏳ PENDIENTE</div>
+
+    <div style="background:var(--orange-light);border:1.5px solid var(--orange);border-radius:10px;padding:12px;text-align:center;margin-bottom:16px">
+      <div style="font-size:18px;font-weight:900;color:var(--orange)">$${totalPendienteHoy.toFixed(2)}</div>
+      <div style="font-size:11px;color:var(--orange);font-weight:700;margin-top:4px">⏳ PENDIENTE HOY</div>
     </div>
   `;
 
   // Desglose
   document.getElementById('finanzasDesgloseMob').innerHTML = `
     <div style="padding:14px">
-      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-weight:700;font-size:13px;color:#dc2626">💸 Gastos</span>
-          <span style="font-weight:800;font-size:15px;color:#dc2626">-$${totalGastos.toFixed(2)}</span>
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:2px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-weight:700;font-size:13px;color:#dc2626">💸 Gastos Hoy</span>
+          <span style="font-weight:800;font-size:15px;color:#dc2626">-$${totalGastosHoy.toFixed(2)}</span>
         </div>
-        <div style="font-size:11px;color:var(--muted)">${gastosHoy.length} gastos registrados</div>
-      </div>
-      <div style="padding-bottom:14px;border-bottom:2px solid var(--border)">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:800;font-size:15px">TOTAL QUE DEBES TENER</span>
-          <span style="font-weight:900;font-size:22px;color:var(--green)">$${totalFinal.toFixed(2)}</span>
+          <span style="font-size:11px;color:var(--muted)">Gastos acumulados</span>
+          <span style="font-size:12px;font-weight:700;color:#dc2626">$${cashRegister.gastosAcumulados.toFixed(2)}</span>
         </div>
       </div>
+      
+      <div style="padding:16px;background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);border-radius:10px;border:2px solid #10b981;margin-bottom:14px">
+        <div style="text-align:center;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:700;color:#065f46">💵 EFECTIVO EN CAJA</div>
+          <div style="font-size:24px;font-weight:900;color:#10b981;margin-top:4px">$${efectivoEnCaja.toFixed(2)}</div>
+        </div>
+        <div style="font-size:10px;color:#065f46;text-align:center">
+          Acumulado: $${cashRegister.efectivoAcumulado.toFixed(2)} - Gastos: $${cashRegister.gastosAcumulados.toFixed(2)}
+        </div>
+      </div>
+
+      <button onclick="hacerCorteCaja()" style="width:100%;background:#f59e0b;color:white;border:none;border-radius:8px;padding:14px;font-weight:700;font-size:14px;margin-bottom:10px">
+        🔄 Hacer Corte de Caja
+      </button>
+      
+      <button onclick="verHistorialCortes()" style="width:100%;background:#6366f1;color:white;border:none;border-radius:8px;padding:14px;font-weight:700;font-size:14px">
+        📊 Ver Historial de Cortes
+      </button>
+
       <div style="margin-top:14px;padding:12px;background:#f8fafc;border-radius:8px">
         <div style="font-size:11px;color:var(--muted);text-align:center">
-          📊 ${ventasHoy.length} ventas hoy | Última actualización: ${new Date().toLocaleTimeString('es-MX')}
+          📊 ${ventasYEntregasHoy.length} operaciones hoy | 🚚 ${entregasHoy.length} entregas
+        </div>
+        <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px">
+          Última actualización: ${new Date().toLocaleTimeString('es-MX')}
         </div>
       </div>
     </div>
@@ -2383,6 +2474,61 @@ function deleteExpenseMob(id) {
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
+// ─── CORTE DE CAJA ───────────────────────────────────────────────────────────
+function hacerCorteCaja() {
+  const confirmar = confirm(`🔄 ¿HACER CORTE DE CAJA?\n\nTotal actual: $${cashRegister.totalAcumulado.toFixed(2)}\nEfectivo: $${cashRegister.efectivoAcumulado.toFixed(2)}\n\nEsto reiniciará el contador pero guardará el registro.\n\n¿Continuar?`);
+  
+  if (!confirmar) return;
+  
+  // Guardar en historial
+  const corte = {
+    fecha: new Date().toISOString(),
+    totalAcumulado: cashRegister.totalAcumulado,
+    efectivoAcumulado: cashRegister.efectivoAcumulado,
+    transferenciaAcumulado: cashRegister.transferenciaAcumulado,
+    gastosAcumulados: cashRegister.gastosAcumulados,
+    fechaInicio: cashRegister.fechaInicio
+  };
+  
+  cashRegister.historialCortes.push(corte);
+  cashRegister.ultimoCorte = corte;
+  
+  // Reiniciar contadores
+  cashRegister.totalAcumulado = 0;
+  cashRegister.efectivoAcumulado = 0;
+  cashRegister.transferenciaAcumulado = 0;
+  cashRegister.gastosAcumulados = 0;
+  cashRegister.fechaInicio = new Date().toISOString();
+  
+  saveData();
+  renderFinanzasMob();
+  
+  toast(`✅ Corte de caja realizado\nTotal: $${corte.totalAcumulado.toFixed(2)}`);
+}
+
+function verHistorialCortes() {
+  if (!cashRegister.historialCortes || cashRegister.historialCortes.length === 0) {
+    alert('No hay cortes de caja registrados');
+    return;
+  }
+  
+  let mensaje = '📊 HISTORIAL DE CORTES DE CAJA\n\n';
+  
+  cashRegister.historialCortes.slice().reverse().forEach((corte, index) => {
+    const num = cashRegister.historialCortes.length - index;
+    mensaje += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    mensaje += `CORTE #${num}\n`;
+    mensaje += `Fecha: ${new Date(corte.fecha).toLocaleDateString('es-MX')} ${new Date(corte.fecha).toLocaleTimeString('es-MX')}\n`;
+    mensaje += `Total: $${corte.totalAcumulado.toFixed(2)}\n`;
+    mensaje += `💵 Efectivo: $${corte.efectivoAcumulado.toFixed(2)}\n`;
+    mensaje += `💳 Transfer: $${corte.transferenciaAcumulado.toFixed(2)}\n`;
+    mensaje += `💸 Gastos: $${corte.gastosAcumulados.toFixed(2)}\n`;
+    mensaje += `\n`;
+  });
+  
+  alert(mensaje);
+}
+
 loadData();
 </script>
 </body>
