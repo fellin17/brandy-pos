@@ -476,43 +476,88 @@ try {
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let products = [], sales = [], cuts = [], expenses = [], cfg = { bizName: 'Brandy POS' };
 let cart = [];
+let isOnline = navigator.onLine;
+let pendingSync = false;
+let lastSyncTime = Date.now();
+
+// ─── OFFLINE/ONLINE DETECTION ─────────────────────────────────────────────────
+window.addEventListener('online', () => {
+  isOnline = true;
+  setSyncStatus('🟢 Conectado - Sincronizando...');
+  syncNow();
+});
+
+window.addEventListener('offline', () => {
+  isOnline = false;
+  setSyncStatus('📱 MODO OFFLINE - Los cambios se guardan localmente');
+  toast('📱 Sin conexión - Trabajando offline', 'info');
+});
+
+// ─── AUTO-SYNC EVERY 10 MINUTES ───────────────────────────────────────────────
+setInterval(() => {
+  if (isOnline && fbReady) {
+    syncNow();
+  }
+}, 10 * 60 * 1000); // 10 minutos
 
 // ─── LOAD DATA ────────────────────────────────────────────────────────────────
 async function loadData() {
-  // Local primero
+  // Local primero (SIEMPRE)
   try {
     const local = JSON.parse(localStorage.getItem('pos_backup') || 'null');
-    if (local) applyData(local);
-  } catch {}
+    if (local) {
+      applyData(local);
+      console.log('✅ Datos locales cargados');
+    }
+  } catch(e) {
+    console.error('Error cargando datos locales:', e);
+  }
 
-  // Firebase
-  if (fbReady) {
+  // Firebase (si hay conexión)
+  if (fbReady && isOnline) {
     try {
       const snap = await Promise.race([
         fbDoc.get(),
-        new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 6000))
+        new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 8000))
       ]);
       if (snap.exists) {
-        applyData(snap.data());
-        localStorage.setItem('pos_backup', JSON.stringify(snap.data()));
-        setSyncStatus('🟢 Sincronizado');
+        const cloudData = snap.data();
+        // Merge inteligente: usar los datos más recientes
+        const localTime = JSON.parse(localStorage.getItem('pos_last_save') || '0');
+        const cloudTime = cloudData.lastUpdate || 0;
+        
+        if (cloudTime > localTime) {
+          applyData(cloudData);
+          localStorage.setItem('pos_backup', JSON.stringify(cloudData));
+          localStorage.setItem('pos_last_save', cloudTime.toString());
+          setSyncStatus('🟢 Sincronizado con nube');
+          lastSyncTime = Date.now();
+        } else {
+          // Local es más reciente, subir a nube
+          await syncNow();
+        }
       }
     } catch(e) {
-      setSyncStatus('🔴 Sin conexión');
+      console.warn('Firebase sin respuesta, usando datos locales');
+      setSyncStatus('📱 MODO OFFLINE');
+      isOnline = false;
     }
 
     // Escuchar cambios en tiempo real
     fbDoc.onSnapshot(snap => {
-      if (snap.exists) {
-        applyData(snap.data());
-        localStorage.setItem('pos_backup', JSON.stringify(snap.data()));
+      if (snap.exists && isOnline) {
+        const cloudData = snap.data();
+        applyData(cloudData);
+        localStorage.setItem('pos_backup', JSON.stringify(cloudData));
         setSyncStatus('🟢 En línea');
-        renderInventario();
-        renderNotas();
+        lastSyncTime = Date.now();
       }
-    }, () => setSyncStatus('🔴 Sin conexión'));
+    }, () => {
+      setSyncStatus('📱 MODO OFFLINE');
+      isOnline = false;
+    });
   } else {
-    setSyncStatus('📱 Modo local');
+    setSyncStatus('📱 MODO OFFLINE');
   }
 }
 
@@ -526,16 +571,77 @@ function applyData(data) {
   renderInventario();
   renderNotas();
   renderUltimosProductos();
+  if (document.getElementById('tab-finanzas').style.display !== 'none') {
+    renderFinanzasMob();
+  }
+  if (document.getElementById('tab-entrega').style.display !== 'none') {
+    renderEntregaMob();
+  }
 }
 
 async function saveData() {
-  const data = { products, sales, cuts, expenses, cfg };
-  try { localStorage.setItem('pos_backup', JSON.stringify(data)); } catch {}
-  if (fbReady) fbDoc.set(data).catch(() => {});
+  const data = { 
+    products, 
+    sales, 
+    cuts, 
+    expenses, 
+    cfg,
+    lastUpdate: Date.now()
+  };
+  
+  // SIEMPRE guardar local
+  try { 
+    localStorage.setItem('pos_backup', JSON.stringify(data));
+    localStorage.setItem('pos_last_save', data.lastUpdate.toString());
+  } catch(e) {
+    console.error('Error guardando local:', e);
+  }
+  
+  // Intentar guardar en Firebase si hay conexión
+  if (fbReady && isOnline) {
+    try {
+      await fbDoc.set(data);
+      setSyncStatus('🟢 Guardado en nube');
+      lastSyncTime = Date.now();
+      pendingSync = false;
+    } catch(e) {
+      console.warn('Error guardando en nube, quedó pendiente');
+      pendingSync = true;
+      setSyncStatus('📱 OFFLINE - Cambios guardados localmente');
+    }
+  } else {
+    pendingSync = true;
+    setSyncStatus('📱 OFFLINE - Cambios guardados localmente');
+  }
+}
+
+async function syncNow() {
+  if (!fbReady || !isOnline) return;
+  
+  try {
+    const local = JSON.parse(localStorage.getItem('pos_backup') || '{}');
+    if (Object.keys(local).length > 0) {
+      await fbDoc.set(local);
+      setSyncStatus('🟢 Sincronizado con nube');
+      lastSyncTime = Date.now();
+      pendingSync = false;
+      toast('✅ Datos sincronizados', 'success');
+    }
+  } catch(e) {
+    console.error('Error en sincronización:', e);
+    setSyncStatus('📱 OFFLINE');
+  }
 }
 
 function setSyncStatus(msg) {
-  document.getElementById('syncStatus').textContent = msg;
+  const el = document.getElementById('syncStatus');
+  if (el) el.textContent = msg;
+  
+  // Mostrar tiempo desde última sincronización
+  const minutes = Math.floor((Date.now() - lastSyncTime) / 60000);
+  if (minutes > 0 && isOnline) {
+    el.textContent += ` (hace ${minutes} min)`;
+  }
 }
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────
@@ -1757,7 +1863,7 @@ function renderEntregaMob() {
   
   // Entregas realizadas hoy
   const entregasHoy = sales.filter(s => {
-    return s.deliveryStatus === 'entregado' && new Date(s.date).toDateString() === hoy;
+    return s.deliveryStatus === 'entregado' && new Date(s.deliveryDate || s.date).toDateString() === hoy;
   });
 
   // Renderizar pendientes
@@ -1765,20 +1871,36 @@ function renderEntregaMob() {
   if (!pendientes.length) {
     listaPendientes.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">✅ No hay entregas pendientes</div>';
   } else {
-    listaPendientes.innerHTML = pendientes.reverse().map(s => `
-      <div style="padding:12px;border-bottom:1px solid var(--border)">
+    listaPendientes.innerHTML = pendientes.reverse().map(s => {
+      // Determinar si tiene deuda
+      const tieneDeuda = s.paymentStatus === 'pendiente' || (s.debt && s.debt > 0);
+      const bgColor = tieneDeuda ? '#fef3c7' : 'transparent';
+      const borderColor = tieneDeuda ? '#f59e0b' : 'var(--border)';
+      
+      return `
+      <div style="padding:12px;border-bottom:1.5px solid ${borderColor};background:${bgColor}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <strong style="font-size:14px">${s.customer}</strong>
           <strong style="color:var(--accent);font-size:15px">$${s.total.toFixed(2)}</strong>
         </div>
-        <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap;margin-bottom:8px">
           <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
             ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
           </span>
-          <span style="color:var(--muted)">${new Date(s.date).toLocaleDateString('es-MX')} ${new Date(s.date).toLocaleTimeString('es-MX')}</span>
+          ${tieneDeuda ? `<span class="tag" style="background:#fef3c7;color:#f59e0b;border:1px solid #f59e0b">💰 Debe: $${(s.debt || s.total).toFixed(2)}</span>` : ''}
+          <span style="color:var(--muted)">${new Date(s.date).toLocaleDateString('es-MX')} ${new Date(s.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button onclick="confirmarEntregaManual('${s.id}')" style="flex:1;background:var(--green);color:white;border:none;border-radius:6px;padding:8px;font-size:11px;font-weight:700">
+            ✅ Confirmar Entrega
+          </button>
+          <button onclick="editarEntrega('${s.id}')" style="background:var(--blue-light);color:var(--blue);border:1px solid var(--blue);border-radius:6px;padding:8px 12px;font-size:11px;font-weight:700">
+            ✏️
+          </button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
 
   // Renderizar entregas realizadas hoy
@@ -1792,21 +1914,27 @@ function renderEntregaMob() {
           <strong style="font-size:14px">${s.customer}</strong>
           <strong style="color:var(--accent);font-size:15px">$${s.total.toFixed(2)}</strong>
         </div>
-        <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap;align-items:center">
+        <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
           <span class="tag ${s.paymentStatus === 'pagado' ? 'tag-green' : 'tag-orange'}">
             ${s.paymentStatus === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
           </span>
           <span class="tag" style="background:${s.paymentMethod === 'efectivo' ? '#ecfdf5' : '#ecfeff'};color:${s.paymentMethod === 'efectivo' ? '#16a34a' : '#0891b2'}">
             ${s.paymentMethod === 'efectivo' ? '💵 Efectivo' : '💳 Transfer'}
           </span>
-          <span style="color:var(--muted)">${new Date(s.deliveryDate || s.date).toLocaleTimeString('es-MX')}</span>
+          <span style="color:var(--muted)">${new Date(s.deliveryDate || s.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
         </div>
-        <div style="display:flex;gap:6px;margin-top:8px">
+        <div style="display:flex;gap:6px">
           <button onclick="enviarWhatsAppEntregaMob('${s.id}')" style="flex:1;background:var(--green-light);color:var(--green);border:1px solid var(--green);border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700">
             📲 WhatsApp
           </button>
-          <button onclick="deshacerEntregaMob('${s.id}')" style="flex:1;background:#fee;color:#dc2626;border:1px solid #dc2626;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700">
-            ↩️ Deshacer
+          <button onclick="editarEntrega('${s.id}')" style="background:var(--blue-light);color:var(--blue);border:1px solid var(--blue);border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700">
+            ✏️
+          </button>
+          <button onclick="deshacerEntregaMob('${s.id}')" style="background:#fee;color:#dc2626;border:1px solid #dc2626;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700">
+            ↩️
+          </button>
+          <button onclick="eliminarEntrega('${s.id}')" style="background:#fef2f2;color:#dc2626;border:1px solid #dc2626;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700">
+            🗑️
           </button>
         </div>
       </div>
@@ -1854,6 +1982,122 @@ _Tu confianza significa mucho para nosotros. Es un gusto poder atenderte._ 🫶
   } else {
     window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`;
   }
+}
+
+// ─── CONFIRMAR ENTREGA MANUAL (SIN QR) ────────────────────────────────────────
+function confirmarEntregaManual(saleId) {
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) return;
+  
+  _entregaSaleMob = sale;
+  
+  // Preguntar estatus de pago
+  const pagado = confirm(`💳 ¿El pago está REALIZADO?\n\nCliente: ${sale.customer}\nTotal: $${sale.total.toFixed(2)}\n\n✅ OK = Pagado\n❌ Cancelar = Pendiente`);
+  const paymentStatus = pagado ? 'pagado' : 'pendiente';
+
+  // Si no pagó completo, preguntar si es pago parcial
+  let paymentMethod = null;
+  if (paymentStatus === 'pendiente') {
+    const parcial = confirm(`¿Hizo un PAGO PARCIAL?\n\n✅ OK = Sí, hizo abono\n❌ Cancelar = No pagó nada`);
+    if (parcial) {
+      const abono = prompt(`¿Cuánto abonó?\n\nTotal: $${sale.total.toFixed(2)}`);
+      if (abono && !isNaN(abono)) {
+        const montoAbono = parseFloat(abono);
+        sale.debt = sale.total - montoAbono;
+        sale.payments = sale.payments || [];
+        sale.payments.push({
+          amount: montoAbono,
+          date: new Date().toISOString(),
+          method: 'efectivo' // Por defecto
+        });
+        toast(`✅ Abono registrado: $${montoAbono.toFixed(2)}\nDeuda restante: $${sale.debt.toFixed(2)}`);
+      }
+    } else {
+      sale.debt = sale.total;
+    }
+  }
+
+  // Preguntar método de pago
+  const efectivo = confirm(`💰 ¿El pago fue en EFECTIVO?\n\n✅ OK = Efectivo 💵\n❌ Cancelar = Transferencia 💳`);
+  paymentMethod = efectivo ? 'efectivo' : 'transferencia';
+  
+  confirmarEntregaMob(paymentStatus, paymentMethod);
+}
+
+// ─── EDITAR ENTREGA ───────────────────────────────────────────────────────────
+function editarEntrega(saleId) {
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) return;
+  
+  const opciones = `EDITAR ENTREGA: ${sale.customer}
+
+1️⃣ Cambiar estatus de pago
+2️⃣ Registrar pago parcial
+3️⃣ Cambiar método de pago
+4️⃣ Cancelar
+
+Ingresa el número de opción:`;
+  
+  const opcion = prompt(opciones);
+  
+  if (opcion === '1') {
+    // Cambiar estatus de pago
+    const pagado = confirm(`¿Marcar como PAGADO?\n\n✅ OK = Pagado\n❌ Cancelar = Pendiente`);
+    sale.paymentStatus = pagado ? 'pagado' : 'pendiente';
+    if (pagado) sale.debt = 0;
+    saveData();
+    toast('✅ Estatus de pago actualizado');
+    renderEntregaMob();
+    renderFinanzasMob();
+  } else if (opcion === '2') {
+    // Pago parcial
+    const abono = prompt(`Total: $${sale.total.toFixed(2)}\nDeuda actual: $${(sale.debt || sale.total).toFixed(2)}\n\n¿Cuánto abonó?`);
+    if (abono && !isNaN(abono)) {
+      const montoAbono = parseFloat(abono);
+      sale.debt = (sale.debt || sale.total) - montoAbono;
+      sale.payments = sale.payments || [];
+      sale.payments.push({
+        amount: montoAbono,
+        date: new Date().toISOString(),
+        method: 'efectivo'
+      });
+      
+      if (sale.debt <= 0) {
+        sale.paymentStatus = 'pagado';
+        sale.debt = 0;
+        toast(`✅ ¡Deuda liquidada! Total pagado: $${sale.total.toFixed(2)}`);
+      } else {
+        toast(`✅ Abono registrado: $${montoAbono.toFixed(2)}\nDeuda restante: $${sale.debt.toFixed(2)}`);
+      }
+      
+      saveData();
+      renderEntregaMob();
+      renderFinanzasMob();
+    }
+  } else if (opcion === '3') {
+    // Cambiar método de pago
+    const efectivo = confirm(`¿Cambiar a EFECTIVO?\n\n✅ OK = Efectivo\n❌ Cancelar = Transferencia`);
+    sale.paymentMethod = efectivo ? 'efectivo' : 'transferencia';
+    saveData();
+    toast('✅ Método de pago actualizado');
+    renderEntregaMob();
+    renderFinanzasMob();
+  }
+}
+
+// ─── ELIMINAR ENTREGA ─────────────────────────────────────────────────────────
+function eliminarEntrega(saleId) {
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) return;
+  
+  if (!confirm(`⚠️ ¿ELIMINAR esta entrega?\n\nCliente: ${sale.customer}\nTotal: $${sale.total.toFixed(2)}\n\n⚠️ Esta acción NO se puede deshacer.\nLa venta se eliminará completamente del sistema.`)) return;
+  
+  sales = sales.filter(s => s.id !== saleId);
+  saveData();
+  toast('🗑️ Entrega eliminada');
+  renderEntregaMob();
+  renderFinanzasMob();
+  renderNotas();
 }
 
 function openScannerEntregaMob() {
@@ -1936,32 +2180,73 @@ _Tu confianza significa mucho para nosotros. Es un gusto poder atenderte._ 🫶
 
 // ─── FINANZAS MÓVIL ───────────────────────────────────────────────────────────
 function renderFinanzasMob() {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0); // Reset to midnight for accurate comparison
+  
   const ventasHoy = sales.filter(s => {
-    const hoy = new Date().toDateString();
-    return new Date(s.date).toDateString() === hoy;
+    const saleDate = new Date(s.date);
+    saleDate.setHours(0, 0, 0, 0);
+    return saleDate.getTime() === hoy.getTime();
   });
 
+  console.log('🔍 FINANZAS DEBUG:');
+  console.log('Total ventas:', sales.length);
+  console.log('Ventas de hoy:', ventasHoy.length);
+  console.log('Fecha hoy:', hoy.toDateString());
+  
+  // Calcular totales con pagos parciales incluidos
   const totalEfectivo = ventasHoy
-    .filter(s => s.paymentStatus === 'pagado' && s.paymentMethod === 'efectivo')
-    .reduce((sum, s) => sum + s.total, 0);
+    .filter(s => s.paymentMethod === 'efectivo')
+    .reduce((sum, s) => {
+      if (s.paymentStatus === 'pagado') {
+        return sum + s.total;
+      } else if (s.payments && s.payments.length > 0) {
+        // Sumar abonos en efectivo
+        const abonosEfectivo = s.payments
+          .filter(p => p.method === 'efectivo')
+          .reduce((a, p) => a + p.amount, 0);
+        return sum + abonosEfectivo;
+      }
+      return sum;
+    }, 0);
 
   const totalTransferencia = ventasHoy
-    .filter(s => s.paymentStatus === 'pagado' && s.paymentMethod === 'transferencia')
-    .reduce((sum, s) => sum + s.total, 0);
+    .filter(s => s.paymentMethod === 'transferencia')
+    .reduce((sum, s) => {
+      if (s.paymentStatus === 'pagado') {
+        return sum + s.total;
+      } else if (s.payments && s.payments.length > 0) {
+        // Sumar abonos en transferencia
+        const abonosTransfer = s.payments
+          .filter(p => p.method === 'transferencia')
+          .reduce((a, p) => a + p.amount, 0);
+        return sum + abonosTransfer;
+      }
+      return sum;
+    }, 0);
 
   const totalPendiente = ventasHoy
     .filter(s => s.paymentStatus === 'pendiente')
-    .reduce((sum, s) => sum + s.total, 0);
+    .reduce((sum, s) => sum + (s.debt || s.total), 0);
+
+  console.log('💵 Efectivo:', totalEfectivo);
+  console.log('💳 Transferencia:', totalTransferencia);
+  console.log('⏳ Pendiente:', totalPendiente);
 
   // Gastos del día
   const gastosHoy = expenses.filter(e => {
-    const hoy = new Date().toDateString();
-    return new Date(e.date).toDateString() === hoy;
+    const expenseDate = new Date(e.date);
+    expenseDate.setHours(0, 0, 0, 0);
+    return expenseDate.getTime() === hoy.getTime();
   });
   const totalGastos = gastosHoy.reduce((sum, e) => sum + e.amount, 0);
 
   const totalGeneral = totalEfectivo + totalTransferencia;
   const totalFinal = totalGeneral - totalGastos;
+
+  console.log('💰 Total general:', totalGeneral);
+  console.log('💸 Gastos:', totalGastos);
+  console.log('✅ Total final:', totalFinal);
 
   // Stats
   document.getElementById('finanzasStatsMob').innerHTML = `
@@ -1997,6 +2282,11 @@ function renderFinanzasMob() {
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-weight:800;font-size:15px">TOTAL QUE DEBES TENER</span>
           <span style="font-weight:900;font-size:22px;color:var(--green)">$${totalFinal.toFixed(2)}</span>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding:12px;background:#f8fafc;border-radius:8px">
+        <div style="font-size:11px;color:var(--muted);text-align:center">
+          📊 ${ventasHoy.length} ventas hoy | Última actualización: ${new Date().toLocaleTimeString('es-MX')}
         </div>
       </div>
     </div>
