@@ -228,7 +228,10 @@ return QRCode;
       <div class="biz-name" id="hdrName">MI NEGOCIO</div>
       <div class="fecha" id="hdrFecha"></div>
     </div>
-    <div id="connStatus" style="margin-left:auto;padding-right:4px"></div>
+    <button onclick="recuperarDatosEmergencia()" style="background:#dc2626;color:white;border:none;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:700;margin-left:auto;margin-right:8px;cursor:pointer" title="Recuperación de emergencia">
+      🆘 RECUPERAR
+    </button>
+    <div id="connStatus" style="padding-right:4px"></div>
   </div>
 
   <!-- NAV -->
@@ -942,34 +945,266 @@ try {
 } catch(e) { console.warn('Firebase init:', e.message); }
 
 // ─── STORAGE ──────────────────────────────────────────────────────────────────
+// ─── VARIABLES DE ESTADO ─────────────────────────────────────────────────────
+let isOnline = navigator.onLine;
+let pendingSync = false;
+let lastSyncTime = Date.now();
+let backupHistory = [];
+const MAX_BACKUPS = 10;
+
+// ─── OFFLINE/ONLINE DETECTION ─────────────────────────────────────────────────
+window.addEventListener('online', () => {
+  isOnline = true;
+  console.log('🟢 Conexión restaurada');
+  if (_fbReady) syncNow();
+});
+
+window.addEventListener('offline', () => {
+  isOnline = false;
+  console.log('📱 Sin conexión - Modo offline');
+});
+
+// ─── MERGE INTELIGENTE - NUNCA PERDER DATOS ──────────────────────────────────
+function mergeData(local, cloud) {
+  console.log('🔄 Haciendo merge inteligente...');
+  console.log('Local:', local.sales?.length || 0, 'ventas');
+  console.log('Cloud:', cloud.sales?.length || 0, 'ventas');
+  
+  const localSales = local.sales || [];
+  const cloudSales = cloud.sales || [];
+  
+  const allSalesMap = new Map();
+  
+  localSales.forEach(sale => allSalesMap.set(sale.id, sale));
+  
+  cloudSales.forEach(sale => {
+    const existing = allSalesMap.get(sale.id);
+    if (!existing) {
+      allSalesMap.set(sale.id, sale);
+    } else {
+      const existingDate = new Date(existing.deliveryDate || existing.date).getTime();
+      const cloudDate = new Date(sale.deliveryDate || sale.date).getTime();
+      if (cloudDate > existingDate) {
+        allSalesMap.set(sale.id, sale);
+      }
+    }
+  });
+  
+  const mergedSales = Array.from(allSalesMap.values());
+  
+  console.log('✅ Merge completado:', mergedSales.length, 'ventas totales');
+  
+  const mergeArrayById = (arr1, arr2) => {
+    const map = new Map();
+    arr1.forEach(item => map.set(item.id, item));
+    arr2.forEach(item => { if (!map.has(item.id)) map.set(item.id, item); });
+    return Array.from(map.values());
+  };
+  
+  return {
+    sales: mergedSales,
+    products: mergeArrayById(local.products || [], cloud.products || []),
+    expenses: mergeArrayById(local.expenses || [], cloud.expenses || []),
+    cuts: mergeArrayById(local.cuts || [], cloud.cuts || []),
+    cfg: { ...(cloud.cfg || {}), ...(local.cfg || {}) },
+    lastUpdate: Date.now()
+  };
+}
+
+// ─── BACKUP AUTOMÁTICO ────────────────────────────────────────────────────────
+function createBackup() {
+  const backup = {
+    timestamp: Date.now(),
+    data: {
+      sales: [...sales],
+      products: [...products],
+      expenses: [...expenses],
+      cuts: [...cuts],
+      cfg: { ...cfg }
+    }
+  };
+  
+  backupHistory.push(backup);
+  if (backupHistory.length > MAX_BACKUPS) {
+    backupHistory = backupHistory.slice(-MAX_BACKUPS);
+  }
+  
+  try {
+    localStorage.setItem('pos_backup_history', JSON.stringify(backupHistory));
+    console.log('💾 Backup creado:', backup.data.sales.length, 'ventas');
+  } catch(e) {
+    console.error('Error creando backup:', e);
+  }
+}
+
+setInterval(() => createBackup(), 30000);
+setTimeout(() => createBackup(), 5000);
+
+// ─── RECUPERACIÓN DE EMERGENCIA ──────────────────────────────────────────────
+function recuperarDatosEmergencia() {
+  const opciones = `🆘 RECUPERACIÓN DE EMERGENCIA
+
+¿Qué deseas hacer?
+
+1️⃣ Ver cuántas ventas hay en cada backup
+2️⃣ Restaurar backup más reciente
+3️⃣ Ver detalles de todos los backups
+4️⃣ Cancelar
+
+Ingresa el número de opción:`;
+  
+  const opcion = prompt(opciones);
+  
+  if (opcion === '1') {
+    try {
+      const history = JSON.parse(localStorage.getItem('pos_backup_history') || '[]');
+      let mensaje = '📊 BACKUPS DISPONIBLES:\n\n';
+      
+      history.forEach((backup, index) => {
+        const fecha = new Date(backup.timestamp);
+        mensaje += `Backup #${index + 1}\n`;
+        mensaje += `Fecha: ${fecha.toLocaleDateString('es-MX')} ${fecha.toLocaleTimeString('es-MX')}\n`;
+        mensaje += `Ventas: ${backup.data.sales?.length || 0}\n`;
+        mensaje += `Productos: ${backup.data.products?.length || 0}\n`;
+        mensaje += `───────────────\n`;
+      });
+      
+      mensaje += `\nVentas actuales en sistema: ${sales.length}`;
+      alert(mensaje);
+    } catch(e) {
+      alert('Error cargando backups: ' + e.message);
+    }
+  } else if (opcion === '2') {
+    if (!confirm('⚠️ ¿RESTAURAR BACKUP MÁS RECIENTE?\n\nEsto reemplazará los datos actuales.\n\n¿Continuar?')) return;
+    
+    try {
+      const history = JSON.parse(localStorage.getItem('pos_backup_history') || '[]');
+      if (history.length === 0) {
+        alert('No hay backups disponibles');
+        return;
+      }
+      
+      const ultimoBackup = history[history.length - 1];
+      
+      sales = ultimoBackup.data.sales || [];
+      products = ultimoBackup.data.products || [];
+      expenses = ultimoBackup.data.expenses || [];
+      cuts = ultimoBackup.data.cuts || [];
+      cfg = ultimoBackup.data.cfg || cfg;
+      
+      saveAll();
+      alert(`✅ BACKUP RESTAURADO\n\nVentas recuperadas: ${sales.length}\nProductos: ${products.length}`);
+      
+      location.reload();
+    } catch(e) {
+      alert('Error restaurando backup: ' + e.message);
+    }
+  } else if (opcion === '3') {
+    try {
+      const history = JSON.parse(localStorage.getItem('pos_backup_history') || '[]');
+      let mensaje = '📋 DETALLES DE BACKUPS:\n\n';
+      
+      history.forEach((backup, index) => {
+        const fecha = new Date(backup.timestamp);
+        mensaje += `━━━━━━━━━━━━━━━━\n`;
+        mensaje += `BACKUP #${index + 1}\n`;
+        mensaje += `Fecha: ${fecha.toLocaleDateString('es-MX')}\n`;
+        mensaje += `Hora: ${fecha.toLocaleTimeString('es-MX')}\n`;
+        mensaje += `Ventas: ${backup.data.sales?.length || 0}\n`;
+        mensaje += `Productos: ${backup.data.products?.length || 0}\n`;
+        mensaje += `Gastos: ${backup.data.expenses?.length || 0}\n`;
+      });
+      
+      alert(mensaje);
+    } catch(e) {
+      alert('Error: ' + e.message);
+    }
+  }
+}
+
+async function syncNow() {
+  if (!_fbReady || !isOnline) return;
+  
+  try {
+    const local = JSON.parse(localStorage.getItem('pos_backup') || '{}');
+    if (Object.keys(local).length > 0) {
+      await _fbDoc.set(local);
+      console.log('✅ Sincronizado con nube');
+    }
+  } catch(e) {
+    console.error('Error en sincronización:', e);
+  }
+}
+
 const DB = {
-  // Carga: localStorage primero (instantáneo), luego Firebase
   async load() {
+    console.log('🔄 Iniciando carga de datos...');
+    
     let local = null;
-    try { local = JSON.parse(localStorage.getItem('pos_backup')); } catch {}
+    try { 
+      local = JSON.parse(localStorage.getItem('pos_backup')); 
+      if (local) console.log('✅ Datos locales:', local.sales?.length || 0, 'ventas');
+    } catch {}
+    
     if (!_fbReady) return local;
+    
     try {
       const snap = await Promise.race([
         _fbDoc.get(),
         new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 5000))
       ]);
+      
       if (snap.exists) {
-        const d = snap.data();
-        try { localStorage.setItem('pos_backup', JSON.stringify(d)); } catch {}
-        return d;
+        const cloudData = snap.data();
+        console.log('☁️ Datos de nube:', cloudData.sales?.length || 0, 'ventas');
+        
+        if (local && local.sales && local.sales.length > 0) {
+          // MERGE INTELIGENTE
+          const merged = mergeData(local, cloudData);
+          try { localStorage.setItem('pos_backup', JSON.stringify(merged)); } catch {}
+          await _fbDoc.set(merged);
+          console.log('✅ Merge guardado en nube');
+          return merged;
+        } else {
+          try { localStorage.setItem('pos_backup', JSON.stringify(cloudData)); } catch {}
+          return cloudData;
+        }
       }
-    } catch(e) { console.warn('Firebase load:', e.message); }
+    } catch(e) { 
+      console.warn('Firebase load:', e.message); 
+    }
+    
     return local;
   },
-  // Guarda: localStorage + Firebase en paralelo
+  
   save(data) {
     try { localStorage.setItem('pos_backup', JSON.stringify(data)); } catch {}
-    if (_fbReady) _fbDoc.set(data).catch(e => console.warn('Firebase save:', e.message));
+    if (_fbReady && isOnline) {
+      _fbDoc.set(data).catch(e => console.warn('Firebase save:', e.message));
+    }
   },
-  // Escucha cambios en tiempo real
+  
   listen(cb) {
     if (!_fbReady) return;
-    _fbDoc.onSnapshot(s => { if (s.exists) cb(s.data()); }, e => console.warn('listen:', e.message));
+    _fbDoc.onSnapshot(s => { 
+      if (s.exists && isOnline) {
+        const cloudData = s.data();
+        console.log('🔔 Cambio en nube:', cloudData.sales?.length || 0, 'ventas');
+        
+        // MERGE antes de aplicar
+        const local = JSON.parse(localStorage.getItem('pos_backup') || '{}');
+        if (local.sales && local.sales.length > 0) {
+          const merged = mergeData(local, cloudData);
+          if (merged.sales.length !== cloudData.sales.length) {
+            console.log('⚠️ Diferencia detectada - aplicando merge');
+            localStorage.setItem('pos_backup', JSON.stringify(merged));
+            cb(merged);
+            return;
+          }
+        }
+        cb(cloudData); 
+      }
+    }, e => console.warn('listen:', e.message));
   }
 };
 

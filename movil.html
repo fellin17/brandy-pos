@@ -123,6 +123,9 @@ body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--
 <div class="header">
   <span style="font-size:22px">🏪</span>
   <h1 id="hdrName">Brandy POS</h1>
+  <button onclick="recuperarDatosEmergencia()" style="background:#dc2626;color:white;border:none;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;margin-right:8px" title="Recuperación de datos">
+    🆘
+  </button>
   <span class="sync" id="syncStatus">⚡ Cargando...</span>
 </div>
 
@@ -491,6 +494,10 @@ let cashRegister = {
   historialCortes: []
 };
 
+// ─── SISTEMA DE BACKUP AUTOMÁTICO ────────────────────────────────────────────
+let backupHistory = [];
+const MAX_BACKUPS = 10;
+
 // ─── OFFLINE/ONLINE DETECTION ─────────────────────────────────────────────────
 window.addEventListener('online', () => {
   isOnline = true;
@@ -511,14 +518,143 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000); // 10 minutos
 
+function createBackup() {
+  const backup = {
+    timestamp: Date.now(),
+    data: {
+      sales: [...sales],
+      products: [...products],
+      expenses: [...expenses],
+      cuts: [...cuts],
+      cfg: { ...cfg },
+      cashRegister: { ...cashRegister }
+    }
+  };
+  
+  backupHistory.push(backup);
+  
+  // Mantener solo los últimos 10 backups
+  if (backupHistory.length > MAX_BACKUPS) {
+    backupHistory = backupHistory.slice(-MAX_BACKUPS);
+  }
+  
+  // Guardar en localStorage
+  try {
+    localStorage.setItem('pos_backup_history', JSON.stringify(backupHistory));
+    console.log('💾 Backup creado:', backup.data.sales.length, 'ventas');
+  } catch(e) {
+    console.error('Error creando backup:', e);
+  }
+}
+
+// Auto-backup cada 30 segundos
+setInterval(() => {
+  createBackup();
+}, 30000);
+
+// Backup inicial
+setTimeout(() => createBackup(), 5000);
+
+// ─── RECUPERACIÓN DE EMERGENCIA ──────────────────────────────────────────────
+function recuperarDatosEmergencia() {
+  const opciones = `🆘 RECUPERACIÓN DE EMERGENCIA
+
+¿Qué deseas hacer?
+
+1️⃣ Ver cuántas ventas hay en cada backup
+2️⃣ Restaurar backup más reciente
+3️⃣ Ver detalles de todos los backups
+4️⃣ Cancelar
+
+Ingresa el número de opción:`;
+  
+  const opcion = prompt(opciones);
+  
+  if (opcion === '1') {
+    // Cargar historial de backups
+    try {
+      const history = JSON.parse(localStorage.getItem('pos_backup_history') || '[]');
+      let mensaje = '📊 BACKUPS DISPONIBLES:\n\n';
+      
+      history.forEach((backup, index) => {
+        const fecha = new Date(backup.timestamp);
+        mensaje += `Backup #${index + 1}\n`;
+        mensaje += `Fecha: ${fecha.toLocaleDateString('es-MX')} ${fecha.toLocaleTimeString('es-MX')}\n`;
+        mensaje += `Ventas: ${backup.data.sales?.length || 0}\n`;
+        mensaje += `Productos: ${backup.data.products?.length || 0}\n`;
+        mensaje += `───────────────\n`;
+      });
+      
+      mensaje += `\nVentas actuales en sistema: ${sales.length}`;
+      alert(mensaje);
+    } catch(e) {
+      alert('Error cargando backups: ' + e.message);
+    }
+  } else if (opcion === '2') {
+    // Restaurar backup más reciente
+    if (!confirm('⚠️ ¿RESTAURAR BACKUP MÁS RECIENTE?\n\nEsto reemplazará los datos actuales.\n\n¿Continuar?')) return;
+    
+    try {
+      const history = JSON.parse(localStorage.getItem('pos_backup_history') || '[]');
+      if (history.length === 0) {
+        alert('No hay backups disponibles');
+        return;
+      }
+      
+      const ultimoBackup = history[history.length - 1];
+      
+      sales = ultimoBackup.data.sales || [];
+      products = ultimoBackup.data.products || [];
+      expenses = ultimoBackup.data.expenses || [];
+      cuts = ultimoBackup.data.cuts || [];
+      cfg = ultimoBackup.data.cfg || cfg;
+      cashRegister = ultimoBackup.data.cashRegister || cashRegister;
+      
+      saveData();
+      
+      alert(`✅ BACKUP RESTAURADO\n\nVentas recuperadas: ${sales.length}\nProductos: ${products.length}`);
+      
+      renderInventario();
+      renderNotas();
+      renderFinanzasMob();
+      renderEntregaMob();
+    } catch(e) {
+      alert('Error restaurando backup: ' + e.message);
+    }
+  } else if (opcion === '3') {
+    try {
+      const history = JSON.parse(localStorage.getItem('pos_backup_history') || '[]');
+      let mensaje = '📋 DETALLES DE BACKUPS:\n\n';
+      
+      history.forEach((backup, index) => {
+        const fecha = new Date(backup.timestamp);
+        mensaje += `━━━━━━━━━━━━━━━━\n`;
+        mensaje += `BACKUP #${index + 1}\n`;
+        mensaje += `Fecha: ${fecha.toLocaleDateString('es-MX')}\n`;
+        mensaje += `Hora: ${fecha.toLocaleTimeString('es-MX')}\n`;
+        mensaje += `Ventas: ${backup.data.sales?.length || 0}\n`;
+        mensaje += `Productos: ${backup.data.products?.length || 0}\n`;
+        mensaje += `Gastos: ${backup.data.expenses?.length || 0}\n`;
+        mensaje += `Caja: $${backup.data.cashRegister?.totalAcumulado || 0}\n`;
+      });
+      
+      alert(mensaje);
+    } catch(e) {
+      alert('Error: ' + e.message);
+    }
+  }
+}
+
 // ─── LOAD DATA ────────────────────────────────────────────────────────────────
 async function loadData() {
+  console.log('🔄 Iniciando carga de datos...');
+  
   // Local primero (SIEMPRE)
   try {
     const local = JSON.parse(localStorage.getItem('pos_backup') || 'null');
     if (local) {
       applyData(local);
-      console.log('✅ Datos locales cargados');
+      console.log('✅ Datos locales cargados:', local.sales?.length || 0, 'ventas');
     }
   } catch(e) {
     console.error('Error cargando datos locales:', e);
@@ -533,20 +669,22 @@ async function loadData() {
       ]);
       if (snap.exists) {
         const cloudData = snap.data();
-        // Merge inteligente: usar los datos más recientes
-        const localTime = JSON.parse(localStorage.getItem('pos_last_save') || '0');
-        const cloudTime = cloudData.lastUpdate || 0;
+        console.log('☁️ Datos de nube:', cloudData.sales?.length || 0, 'ventas');
         
-        if (cloudTime > localTime) {
-          applyData(cloudData);
-          localStorage.setItem('pos_backup', JSON.stringify(cloudData));
-          localStorage.setItem('pos_last_save', cloudTime.toString());
-          setSyncStatus('🟢 Sincronizado con nube');
-          lastSyncTime = Date.now();
-        } else {
-          // Local es más reciente, subir a nube
-          await syncNow();
-        }
+        // MERGE INTELIGENTE - NUNCA PERDER DATOS
+        const localData = JSON.parse(localStorage.getItem('pos_backup') || '{}');
+        const mergedData = mergeData(localData, cloudData);
+        
+        applyData(mergedData);
+        localStorage.setItem('pos_backup', JSON.stringify(mergedData));
+        localStorage.setItem('pos_last_save', Date.now().toString());
+        
+        // Subir el merge a la nube
+        await fbDoc.set(mergedData);
+        
+        setSyncStatus('🟢 Sincronizado con nube');
+        lastSyncTime = Date.now();
+        console.log('✅ Datos sincronizados:', mergedData.sales?.length || 0, 'ventas totales');
       }
     } catch(e) {
       console.warn('Firebase sin respuesta, usando datos locales');
@@ -554,12 +692,22 @@ async function loadData() {
       isOnline = false;
     }
 
-    // Escuchar cambios en tiempo real
+    // Escuchar cambios en tiempo real - CON MERGE INTELIGENTE
     fbDoc.onSnapshot(snap => {
       if (snap.exists && isOnline) {
         const cloudData = snap.data();
-        applyData(cloudData);
-        localStorage.setItem('pos_backup', JSON.stringify(cloudData));
+        console.log('🔔 Cambio detectado en nube:', cloudData.sales?.length || 0, 'ventas');
+        
+        // CRÍTICO: HACER MERGE, NO SOBRESCRIBIR
+        const localData = JSON.parse(localStorage.getItem('pos_backup') || '{}');
+        const mergedData = mergeData(localData, cloudData);
+        
+        if (mergedData.sales?.length !== (sales?.length || 0)) {
+          console.log('⚠️ Diferencia detectada - aplicando merge');
+          applyData(mergedData);
+          localStorage.setItem('pos_backup', JSON.stringify(mergedData));
+        }
+        
         setSyncStatus('🟢 En línea');
         lastSyncTime = Date.now();
       }
@@ -570,6 +718,77 @@ async function loadData() {
   } else {
     setSyncStatus('📱 MODO OFFLINE');
   }
+}
+
+// ─── MERGE INTELIGENTE - NUNCA PERDER DATOS ──────────────────────────────────
+function mergeData(local, cloud) {
+  console.log('🔄 Haciendo merge inteligente...');
+  console.log('Local:', local.sales?.length || 0, 'ventas');
+  console.log('Cloud:', cloud.sales?.length || 0, 'ventas');
+  
+  // Merge de sales - unir ambas listas sin duplicados
+  const localSales = local.sales || [];
+  const cloudSales = cloud.sales || [];
+  
+  const allSalesMap = new Map();
+  
+  // Agregar todas las ventas locales
+  localSales.forEach(sale => {
+    allSalesMap.set(sale.id, sale);
+  });
+  
+  // Agregar/actualizar con ventas de la nube (solo si son más recientes)
+  cloudSales.forEach(sale => {
+    const existing = allSalesMap.get(sale.id);
+    if (!existing) {
+      // Nueva venta que no existe en local
+      allSalesMap.set(sale.id, sale);
+    } else {
+      // Existe - usar la versión más reciente
+      const existingDate = new Date(existing.deliveryDate || existing.date).getTime();
+      const cloudDate = new Date(sale.deliveryDate || sale.date).getTime();
+      if (cloudDate > existingDate) {
+        allSalesMap.set(sale.id, sale);
+      }
+    }
+  });
+  
+  const mergedSales = Array.from(allSalesMap.values());
+  
+  console.log('✅ Merge completado:', mergedSales.length, 'ventas totales');
+  
+  // Merge de otros datos
+  const mergedProducts = mergeArrayById(local.products || [], cloud.products || []);
+  const mergedExpenses = mergeArrayById(local.expenses || [], cloud.expenses || []);
+  const mergedCuts = mergeArrayById(local.cuts || [], cloud.cuts || []);
+  
+  // Usar el cashRegister más reciente
+  const localCashUpdate = local.cashRegister?.lastUpdate || 0;
+  const cloudCashUpdate = cloud.cashRegister?.lastUpdate || 0;
+  const cashRegister = localCashUpdate > cloudCashUpdate ? 
+    (local.cashRegister || cloud.cashRegister) : 
+    (cloud.cashRegister || local.cashRegister);
+  
+  return {
+    sales: mergedSales,
+    products: mergedProducts,
+    expenses: mergedExpenses,
+    cuts: mergedCuts,
+    cfg: { ...(cloud.cfg || {}), ...(local.cfg || {}) },
+    cashRegister: cashRegister,
+    lastUpdate: Date.now()
+  };
+}
+
+function mergeArrayById(arr1, arr2) {
+  const map = new Map();
+  arr1.forEach(item => map.set(item.id, item));
+  arr2.forEach(item => {
+    if (!map.has(item.id)) {
+      map.set(item.id, item);
+    }
+  });
+  return Array.from(map.values());
 }
 
 function applyData(data) {
