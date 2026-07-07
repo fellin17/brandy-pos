@@ -506,10 +506,17 @@ return QRCode;
       <div class="card" style="margin-bottom:16px">
         <div class="card-header">📅 Ventas pendientes de corte</div>
         <div style="padding:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+            <label style="font-size:13px;font-weight:600;color:var(--muted)">📅 Día de ventas:</label>
+            <input type="date" id="cutDate" class="input" style="max-width:180px" onchange="renderCut()">
+          </div>
           <div class="stats-grid" id="cutStatsToday"></div>
           <div id="cutSalesToday" style="margin-bottom:16px"></div>
           <button class="btn btn-orange btn-block" onclick="doCut()" style="font-size:14px;padding:12px">
-            ✂️ Hacer Corte e Imprimir
+            ✂️ Hacer Corte del día e Imprimir
+          </button>
+          <button class="btn btn-block" onclick="doCutGeneral()" style="font-size:13px;padding:10px;margin-top:8px;background:#374151;color:#fff">
+            📊 Corte General (todo lo pendiente)
           </button>
         </div>
       </div>
@@ -2038,9 +2045,12 @@ function generateCutPDF(cut) {
   doc.text('CORTE DE CAJA', W/2, y, {align:'center'}); ln(10);
 
   const d = new Date(cut.date);
+  const ventasLabel = cut.salesDay === 'GENERAL' ? 'General (todas las pendientes)'
+    : cut.salesDay ? new Date(cut.salesDay+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
+    : d.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   doc.setFontSize(11); doc.setFont('helvetica','normal');
-  doc.text(`Fecha: ${d.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}`, PL, y); ln(6);
-  doc.text(`Hora del corte: ${d.toLocaleTimeString('es-MX')}`, PL, y); ln(6);
+  doc.text(`Ventas del: ${ventasLabel}`, PL, y); ln(6);
+  doc.text(`Hora del corte: ${d.toLocaleDateString('es-MX')} ${d.toLocaleTimeString('es-MX')}`, PL, y); ln(6);
   doc.text(`Folio: #${cut.id.slice(-8).toUpperCase()}`, PL, y); ln(8);
   doc.setLineWidth(0.4); doc.line(PL, y, W-PR, y); ln(8);
 
@@ -2073,8 +2083,18 @@ function generateCutPDF(cut) {
 }
 
 // ─── CUT ──────────────────────────────────────────────────────────────────────
+function localYMD(d) { return new Date(d).toLocaleDateString('en-CA'); }
+
 function renderCut() {
-  const todaySales = sales.filter(s => !s.inCut);
+  const dateInput = document.getElementById('cutDate');
+  const pending = sales.filter(s => !s.inCut);
+  const pendingDays = [...new Set(pending.map(s => localYMD(s.date)))].sort();
+  let selDay = dateInput ? dateInput.value : '';
+  if (!selDay) {
+    selDay = pendingDays.length ? pendingDays[pendingDays.length - 1] : localYMD(new Date());
+    if (dateInput) dateInput.value = selDay;
+  }
+  const todaySales = pending.filter(s => localYMD(s.date) === selDay);
   const totalSold  = todaySales.reduce((s,x) => s+x.total,  0);
   const totalProfit= todaySales.reduce((s,x) => s+x.profit, 0);
 
@@ -2105,8 +2125,8 @@ function renderCut() {
       <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <div>
-            <strong>${new Date(c.date).toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</strong>
-            <span style="color:var(--muted);font-size:12px;margin-left:8px">${new Date(c.date).toLocaleTimeString('es-MX')}</span>
+            <strong>${c.salesDay === 'GENERAL' ? 'Corte general (todas)' : c.salesDay ? new Date(c.salesDay+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : new Date(c.date).toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</strong>
+            <span style="color:var(--muted);font-size:12px;margin-left:8px">cortado ${new Date(c.date).toLocaleDateString('es-MX')} ${new Date(c.date).toLocaleTimeString('es-MX')}</span>
           </div>
           <button class="btn btn-ghost btn-sm" onclick="generateCutPDF(cuts.find(x=>x.id==='${c.id}'))">🖨️ Reimprimir corte</button>
         </div>
@@ -2120,24 +2140,37 @@ function renderCut() {
 }
 
 function doCut() {
-  const todaySales = sales.filter(s => !s.inCut);
-  if (!todaySales.length) { toast('No hay ventas pendientes de corte', 'error'); return; }
+  const selDay = document.getElementById('cutDate')?.value || localYMD(new Date());
+  const daySales = sales.filter(s => !s.inCut && localYMD(s.date) === selDay);
+  if (!daySales.length) { toast('No hay ventas pendientes de corte para ese día', 'error'); return; }
+  finalizeCut(daySales, selDay);
+}
 
+function doCutGeneral() {
+  const pending = sales.filter(s => !s.inCut);
+  if (!pending.length) { toast('No hay ventas pendientes de corte', 'error'); return; }
+  if (!confirm(`¿Hacer CORTE GENERAL de TODAS las ventas pendientes (${pending.length})?\n\nSe cerrarán todas sin importar el día.`)) return;
+  finalizeCut(pending, 'GENERAL');
+}
+
+function finalizeCut(list, salesDay) {
   const cut = {
     id: Date.now().toString(),
     date: new Date().toISOString(),
-    salesCount: todaySales.length,
-    totalSold:  todaySales.reduce((s,x) => s+x.total,  0),
-    totalProfit:todaySales.reduce((s,x) => s+x.profit, 0),
-    saleIds:    todaySales.map(x => x.id),
+    salesDay: salesDay || null,
+    salesCount: list.length,
+    totalSold:  list.reduce((s,x) => s+x.total,  0),
+    totalProfit:list.reduce((s,x) => s+x.profit, 0),
+    saleIds:    list.map(x => x.id),
   };
 
-  sales = sales.map(s => todaySales.find(ts => ts.id === s.id) ? {...s, inCut:true} : s);
-  saveAll();
+  const ids = new Set(list.map(x => x.id));
+  sales = sales.map(s => ids.has(s.id) ? {...s, inCut:true} : s);
   cuts.push(cut);
   saveAll();
   generateCutPDF(cut);
   toast('¡Corte realizado! PDF descargado ✂️');
+  const di = document.getElementById('cutDate'); if (di) di.value = '';
   renderCut();
 }
 
