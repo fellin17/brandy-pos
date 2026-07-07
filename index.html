@@ -1678,7 +1678,8 @@ function printLabel(customer, total, saleDate, saleId = null) {
     <style>
       @page { size: 33mm 40mm; margin: 0; }
       * { margin:0; padding:0; box-sizing:border-box; }
-      html, body { width:33mm; height:40mm; }
+      html { width:33mm; height:40mm; overflow:hidden; }
+      body { width:33mm; height:39mm; overflow:hidden; }
       body {
         display:flex;
         flex-direction:column;
