@@ -504,7 +504,7 @@ return QRCode;
       <div style="font-weight:700;font-size:16px;margin-bottom:16px">✂️ Corte de Caja</div>
 
       <div class="card" style="margin-bottom:16px">
-        <div class="card-header">📅 Ventas de hoy (pendientes de corte)</div>
+        <div class="card-header">📅 Ventas pendientes de corte</div>
         <div style="padding:16px">
           <div class="stats-grid" id="cutStatsToday"></div>
           <div id="cutSalesToday" style="margin-bottom:16px"></div>
@@ -1669,13 +1669,13 @@ function printLabel(customer, total, saleDate, saleId = null) {
   
   win.document.write(`<!DOCTYPE html><html><head>
     <style>
-      @page { size: 41mm 33mm; margin: 0; }
+      @page { size: 33mm 40mm; margin: 0; }
       * { margin:0; padding:0; box-sizing:border-box; }
-      html, body { width:41mm; height:33mm; }
+      html, body { width:33mm; height:40mm; }
       body {
         display:flex;
         flex-direction:column;
-        justify-content:space-between;
+        justify-content:center;
         align-items:center;
         font-family:Arial,sans-serif;
         padding:${margin}mm;
@@ -1685,21 +1685,14 @@ function printLabel(customer, total, saleDate, saleId = null) {
         width:100%;
         text-align:center;
       }
-      .name  { font-size:${nameSize}pt; font-weight:bold; line-height:1.1; margin-bottom:0.5mm; }
-      .price-date { display:flex; justify-content:center; align-items:baseline; gap:2mm; margin-top:0.5mm; }
+      .name  { font-size:${nameSize}pt; font-weight:bold; line-height:1.15; margin-bottom:1mm; word-wrap:break-word; }
       .total { font-size:${priceSize}pt; font-weight:bold; }
-      .fecha { font-size:6pt; color:#666; }
-      .qr { width:23mm; height:23mm; display:block; }
     </style>
   </head><body onload="setTimeout(()=>{window.print();},200)">
     <div class="info">
       <div class="name">${escHtml(customer)}</div>
-      <div class="price-date">
-        <span class="total">$${parseFloat(total).toFixed(2)}</span>
-        ${showDate ? `<span class="fecha">${fecha}</span>` : ''}
-      </div>
+      <div class="total">$${parseFloat(total).toFixed(2)}</div>
     </div>
-    ${qrHTML}
   </body></html>`);
   win.document.close();
 }
@@ -2081,19 +2074,18 @@ function generateCutPDF(cut) {
 
 // ─── CUT ──────────────────────────────────────────────────────────────────────
 function renderCut() {
-  const today = new Date().toDateString();
-  const todaySales = sales.filter(s => new Date(s.date).toDateString() === today && !s.inCut);
+  const todaySales = sales.filter(s => !s.inCut);
   const totalSold  = todaySales.reduce((s,x) => s+x.total,  0);
   const totalProfit= todaySales.reduce((s,x) => s+x.profit, 0);
 
   document.getElementById('cutStatsToday').innerHTML = `
-    <div class="stat-card"><div class="stat-value" style="color:var(--accent)">${todaySales.length}</div><div class="stat-label">Ventas hoy</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--accent)">${todaySales.length}</div><div class="stat-label">Ventas pendientes</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--orange)">${fmt(totalSold)}</div><div class="stat-label">Total vendido</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--green)">${fmt(totalProfit)}</div><div class="stat-label">Ganancia</div></div>`;
 
   const ct = document.getElementById('cutSalesToday');
   if (!todaySales.length) {
-    ct.innerHTML = '<div class="empty"><div>No hay ventas pendientes de corte hoy</div></div>';
+    ct.innerHTML = '<div class="empty"><div>No hay ventas pendientes de corte</div></div>';
   } else {
     ct.innerHTML = `<table><thead><tr><th>Clienta</th><th>Hora</th><th style="text-align:right">Total</th><th style="text-align:right">Ganancia</th></tr></thead><tbody>
       ${todaySales.map(s => `<tr>
@@ -2128,8 +2120,7 @@ function renderCut() {
 }
 
 function doCut() {
-  const today = new Date().toDateString();
-  const todaySales = sales.filter(s => new Date(s.date).toDateString() === today && !s.inCut);
+  const todaySales = sales.filter(s => !s.inCut);
   if (!todaySales.length) { toast('No hay ventas pendientes de corte', 'error'); return; }
 
   const cut = {
